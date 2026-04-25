@@ -1,0 +1,242 @@
+# Quai Emissions Dashboard
+
+A Next.js dashboard tracking QUAI and Qi token emissions on the Quai Network
+`cyprus1` zone. Combines a live Postgres-backed ingest worker (in tail mode
+the cursor stays within ~3 seconds of chain head) with a charting frontend
+that surfaces realized circulating supply, SOAP burn, mining issuance, and
+the eventual maximum-supply trajectory vs. Bitcoin.
+
+> Single zone, single chain, single source of truth. The realized-supply
+> math lives in a Postgres view (`v_supply_*`) so chart code never has to
+> reconcile gross-vs-net or worry about the SOAP-burn-already-subtracted
+> footgun documented in `docs/emissions-full-picture.md`.
+
+---
+
+## Quick start
+
+```bash
+# 1. install
+npm install
+
+# 2. configure environment
+cp .env.local.example .env.local
+$EDITOR .env.local        # set DATABASE_URL; QUAI_ZONE_RPC has a sane default
+
+# 3. apply schema (eight migrations, idempotent, transaction-wrapped)
+npm run migrate
+
+# 4. start the ingest worker — tail mode after backfill
+npm run ingest            # backfill from genesis, then tail head with 3s polling
+
+# 5. in another terminal, run the dashboard
+npm run dev
+# → http://localhost:3000/dashboard
+```
+
+The dev server only needs the ingest to have written *some* rollups for charts
+to render meaningfully — you don't have to wait for full backfill. The
+home page hero will show real numbers as soon as the first daily rollup
+covers the SOAP-active period.
+
+---
+
+## Requirements
+
+- **Node 20+** (Next.js 16 requires it; the `tsx` runner used by the ingest
+  scripts works the same)
+- **Postgres 14+** with `numeric(78,0)` support — basically any modern build.
+  Managed services tested: Supabase, Neon, AWS RDS. Use `?sslmode=require`
+  in the connection string for managed providers.
+- **A Quai zone RPC** — `https://rpc.quai.network/cyprus1` works for the
+  current tip; `https://debug.rpc.quai.network/cyprus1` adds support for
+  PR 2696's historical `quai_getMiningInfo` (needed for full backfill of
+  the SOAP-era `mining_info` table).
+
+---
+
+## Environment variables
+
+| var | required | default | purpose |
+|---|---|---|---|
+| `DATABASE_URL` | **yes** | — | Postgres connection string. Used by migrations, ingest worker, and route handlers. |
+| `QUAI_ZONE_RPC` | no | `https://rpc.quai.network/${NEXT_PUBLIC_QUAI_ZONE}` | Single zone JSON-RPC endpoint. All RPC calls (blocks, supply analytics, balances, getMiningInfo) go here. |
+| `NEXT_PUBLIC_QUAI_ZONE` | no | `cyprus1` | Zone slug — also used by the URL fallback above and surfaced in the UI. |
+| `NEXT_PUBLIC_ROLLUPS_ENABLED` | no | `false` | Gate flag for the rollup chart grid on `/dashboard/history`. Set to `true` once `/api/rollups` is healthy. |
+
+The example file (`.env.local.example`) is the canonical reference. The
+`.env.local` you create from it is gitignored along with every other
+`.env*` variant; only `.env*.example` files are tracked.
+
+---
+
+## Available scripts
+
+| command | what it does |
+|---|---|
+| `npm run dev` | Next.js dev server with Turbopack (port 3000). |
+| `npm run build` | Production build. |
+| `npm run start` | Serve the production build. |
+| `npm run typecheck` | `tsc --noEmit` across the entire repo. |
+| `npm run migrate` | Apply pending SQL migrations from `migrations/` in filename order. Tracked in `schema_migrations`; idempotent. |
+| `npm run reset:db` | **Destructive** — drops and recreates everything. Local-only convenience for full re-backfill. |
+| `npm run ingest` | Unified backfill + tail worker. Backfills from genesis to `(head − FINALITY_BUFFER)` in 10k-block chunks, then enters tail mode polling every 3 s. |
+| `npm run backfill` | Backfill-only worker (does not enter tail). Accepts `--limit=N` and `--chunk=N`. |
+| `npm run rollup` | Full rebuild of `rollups_daily/weekly/monthly`. Normally run automatically on each tail tick — invoke manually only if a column changes or you suspect drift. |
+
+---
+
+## Routes
+
+The dashboard lives entirely under `/dashboard`. Legacy `/history` and
+`/live` redirect (308) to `/dashboard/history` and `/dashboard/live` with
+query strings preserved.
+
+| route | audience | content |
+|---|---|---|
+| `/dashboard` | holders | Hero (6 KPIs) · SOAP + Singularity callouts · supply story · Qi cumulative · mining-issuance-since-SOAP · QUAI vs Bitcoin emission curves to 2050 |
+| `/dashboard/mining` | miners | Hero (4 KPIs) · per-algorithm composition flagship · hashrate · difficulty · block reward · uncled ratio · top coinbases (last 7d) |
+| `/dashboard/history` | analysts | URL-state-driven period × range slicer with the legacy 8-chart grid |
+| `/dashboard/live` | devs / chain integrators | Hero (4 KPIs) · block-interval scatter with reorg markers · recent blocks feed · reorg log · live emission charts |
+
+---
+
+## API
+
+Internal-stable. Documented for transparency, not contract.
+
+| endpoint | purpose | cache |
+|---|---|---|
+| `/api/health` | head block, ingest cursor lag, backfill flag | 5 s |
+| `/api/stats` | live `quai_getMiningInfo` + supply analytics from store | 30 s |
+| `/api/blocks?limit=N` | last N blocks from `blocks` table | 15 s |
+| `/api/emissions?limit=N` | per-block emissions joined with analytics | 15 s |
+| `/api/rollups?period=&from=&to=` | period aggregates from `rollups_*` | 30 s + 5 m SWR |
+| `/api/rollups/meta` | rollup date bounds and row counts | 60 s |
+| `/api/supply?period=&from=&to=&include=qi,burn,genesis` | realized-circulating math from `v_supply_*` views | 60 s + 5 m SWR |
+| `/api/coinbase-leaderboard?days=&limit=` | top coinbases by blocks won | 5 m |
+| `/api/reorgs?limit=&before=` | paginated reorg log + last-24h count | 60 s |
+
+---
+
+## Architecture cheat sheet
+
+### Ingest
+
+`scripts/ingest/run.ts` runs in two modes back-to-back:
+
+- **Backfill** — discrete 10k-block chunks. Each chunk fetches headers
+  (parallel batches of 2 000), supply analytics (one batch of up to 10 000),
+  the `0x0050AF…` SOAP-burn balance per block, and — every 60th block —
+  full block bodies for workshare classification + a `mining_info` row.
+  Backfill samples 1:60 by design (≈ 288 samples/day; <2% stddev on
+  extrapolated columns).
+- **Tail** — every block dense, polled every 3 s. Reorg detection compares
+  hashes of the last 10 blocks; mismatches log to `reorg_log` and rewind.
+
+After each chunk (backfill) or tick (tail), incremental rollup queries
+re-aggregate the affected periods only.
+
+### Schema
+
+8 migrations in `migrations/` (see `migrations/README.md` for conventions):
+
+- `0001_init.sql` — `blocks`, `supply_analytics`, `ingest_cursor`
+- `0002_rollups.sql` — `rollups_daily/weekly/monthly`
+- `0003_reorg_log.sql` — append-only audit
+- `0004_avg_block_time.sql` — per-period block-time column
+- `0005_soap_mining.sql` — per-algorithm columns + `mining_info` table
+- `0006_supply_views.sql` + `0008_supply_views_fix.sql` — realized-supply views
+- `0007_coinbase_index.sql` — `(primary_coinbase, ts DESC)` index
+
+### Sampling
+
+Critical reading before adding a chart that touches per-algo data:
+[`docs/sampling.md`](./docs/sampling.md). Summary: dense columns (workshare
+totals, EMA uncled, base block reward, exchange rate, conversion flow) are
+exact; sampled columns (per-algo workshare counts during backfill,
+per-algo hashrate/difficulty averages) are extrapolated or averaged at
+period level. Never sum a sampled per-block column directly during the
+backfill window — use the rollup's pre-computed `*_sum` field, which
+applies the correct extrapolation formula.
+
+### Supply reconciliation
+
+The single most-likely-to-be-wrong number on the dashboard is realized
+circulating supply. Three rules to live by:
+
+1. `quaiSupplyTotal` from the RPC is **already net** of the SOAP burn at
+   `0x0050AF…`. Do **not** subtract the burn balance again client-side.
+2. `quaiSupplyAdded` and `quaiSupplyRemoved` are **gross** flows — every
+   transfer A→B credits both. Don't read either as "minted" or "burned."
+3. The Singularity Fork (2026-03-19, Prime block 1,530,500) eliminated
+   ~1.667 B QUAI of *future* unlocks. Those allocations were never minted
+   into `quaiSupplyTotal`, so there is **nothing to subtract** from any
+   curve to "account for" Singularity. The fork shows up as a
+   `<ProtocolEventLines>` annotation only.
+
+[`docs/emissions-full-picture.md`](./docs/emissions-full-picture.md) has
+the full source-verified treatment with go-quai pointers.
+
+---
+
+## Project layout
+
+```
+app/
+  api/          route handlers (health, stats, blocks, rollups, supply, …)
+  dashboard/    home + mining + history + live pages, with shared layout
+  layout.tsx    root layout (theme provider + top nav + react-query)
+components/
+  dashboard/
+    home/       home-page charts and callouts (Soap/Singularity)
+    mining/     mining-page charts and tables
+    history/    legacy v1 chart components reused across history surfaces
+    live/       block-interval scatter, recent-blocks feed, reorg-log table
+    shared/     HeroStrip, FreshnessLabel, SamplingFootnote, TimeframeToggle, DashboardSubNav
+  ui/           Card, ThemeToggle, InfoPopover
+  layout/       TopNav
+lib/
+  comparisons/  Bitcoin schedule, Quai cap projection
+  quai/         protocol constants, types, format, store, conversion math
+  format.ts     human-readable formatters
+  hooks.ts      React Query hooks (useStats, useBlocks, useRollups, useSupply, useReorgs, …)
+migrations/     SQL migrations — see migrations/README.md
+scripts/
+  ingest/       run.ts (unified worker) + backfill.ts + rollup.ts + helpers
+  migrate.ts    apply pending migrations
+  reset-db.ts   destructive local reset
+docs/           design + reasoning docs (read these before redesigning)
+```
+
+---
+
+## Production deploy notes
+
+- **Vercel works out of the box** for the frontend. Set the same env vars
+  in the Vercel project. The `next.config.mjs` redirects survive
+  serverless without configuration.
+- **The ingest worker is not serverless-friendly.** Run it as a
+  long-lived process — a small VPS, a Render Worker, or a Railway service
+  with `npm run ingest` as the start command. It expects to be the only
+  writer to `blocks`, `supply_analytics`, `mining_info`, and `rollups_*`
+  tables.
+- **Postgres connection pool**: `lib/db.ts` uses `max: 10` per Next.js
+  instance. With managed Postgres + a serverless deploy, prefer the
+  pooled connection URL (Supabase pooler, Neon pooled URL, etc.) so the
+  ingest worker and dashboard processes don't fight for connections.
+
+---
+
+## Background reading
+
+- [`docs/dashboard-proposal.md`](./docs/dashboard-proposal.md) — design
+  spec for the current dashboard layout (audiences, page-by-page intent,
+  data contracts).
+- [`docs/emissions-full-picture.md`](./docs/emissions-full-picture.md) —
+  authoritative reconciliation of QUAI and Qi supply mechanics, including
+  go-quai source pointers.
+- [`docs/sampling.md`](./docs/sampling.md) — dense vs. sampled column
+  ownership and accuracy guarantees.
+- [`docs/phase3-soap-dashboard.md`](./docs/phase3-soap-dashboard.md) —
+  rationale for the SOAP-era data model in `migrations/0005`.

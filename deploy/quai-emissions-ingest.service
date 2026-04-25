@@ -1,0 +1,68 @@
+# /etc/systemd/system/quai-emissions-ingest.service
+#
+# Ingest worker — backfill + tail. Long-lived process. Should be the ONLY
+# writer to blocks / supply_analytics / mining_info / rollups_* tables.
+#
+# Replace before installing:
+#   - User=quai            → the unprivileged user that owns the deploy
+#   - WorkingDirectory     → absolute path to your checkout (must contain
+#                             .env.local, package.json, scripts/, migrations/)
+#
+# Install:
+#   sudo cp deploy/quai-emissions-ingest.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now quai-emissions-ingest
+#
+# Inspect:
+#   systemctl status quai-emissions-ingest
+#   journalctl -u quai-emissions-ingest -f
+#
+# Note: env vars are loaded by `tsx --env-file=.env.local` inside the npm
+# script, so EnvironmentFile= is intentionally omitted to avoid double-load
+# semantics drift between dotenv and systemd parsing.
+
+[Unit]
+Description=Quai Emissions ingest worker (backfill + tail, cyprus1)
+Documentation=https://github.com/your-org/quai-emissions-db
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=quai
+Group=quai
+WorkingDirectory=/srv/quai-emissions-db
+ExecStart=/usr/bin/env npm run ingest
+
+# Auto-restart on transient RPC / DB failures, but back off if something
+# is structurally broken (5 failures within 5 minutes → stop trying).
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+# Output goes to journald; tail with `journalctl -u quai-emissions-ingest -f`
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=quai-ingest
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/quai-emissions-db
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,66 @@
+# /etc/systemd/system/quai-emissions-dashboard.service
+#
+# Next.js production server. Requires `npm run build` to have completed
+# successfully first — without a `.next/` build artifact `next start`
+# refuses to run.
+#
+# Replace before installing:
+#   - User=quai            → the unprivileged user that owns the deploy
+#   - WorkingDirectory     → absolute path to your checkout
+#   - PORT=3000            → adjust if 3000 conflicts with another service
+#
+# Install:
+#   cd /srv/quai-emissions-db && sudo -u quai npm ci && sudo -u quai npm run build
+#   sudo cp deploy/quai-emissions-dashboard.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now quai-emissions-dashboard
+#
+# Inspect:
+#   systemctl status quai-emissions-dashboard
+#   journalctl -u quai-emissions-dashboard -f
+
+[Unit]
+Description=Quai Emissions dashboard (Next.js)
+Documentation=https://github.com/your-org/quai-emissions-db
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=quai
+Group=quai
+WorkingDirectory=/srv/quai-emissions-db
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/env npm run start
+
+# Dashboard should be up unless told otherwise — restart aggressively.
+Restart=always
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=quai-dashboard
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/quai-emissions-db
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+[Install]
+WantedBy=multi-user.target
