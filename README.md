@@ -206,21 +206,71 @@ scripts/
   ingest/       run.ts (unified worker) + backfill.ts + rollup.ts + helpers
   migrate.ts    apply pending migrations
   reset-db.ts   destructive local reset
+deploy/         systemd units + nginx config for Ubuntu self-host
 docs/           design + reasoning docs (read these before redesigning)
 ```
 
 ---
 
-## Production deploy notes
+## Production deploy
 
-- **Vercel works out of the box** for the frontend. Set the same env vars
+### Ubuntu + systemd + nginx (recommended for self-hosting)
+
+The [`deploy/`](./deploy) directory ships ready-to-use systemd units and an
+nginx reverse-proxy config:
+
+| file | purpose |
+|---|---|
+| [`deploy/quai-emissions-ingest.service`](./deploy/quai-emissions-ingest.service) | systemd unit for the long-lived ingest worker (`Restart=on-failure` with backoff) |
+| [`deploy/quai-emissions-dashboard.service`](./deploy/quai-emissions-dashboard.service) | systemd unit for `next start` (`Restart=always`) |
+| [`deploy/nginx-quai-emissions.conf`](./deploy/nginx-quai-emissions.conf) | nginx site — HTTPS reverse proxy → `:3000`, HTTP/2, HSTS, immutable cache for `/_next/static`, gzip |
+| [`deploy/README.md`](./deploy/README.md) | step-by-step install + Let's Encrypt + updates + troubleshooting |
+
+Quick path for a fresh Ubuntu host:
+
+```bash
+# Node 20 + nginx
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs nginx
+
+# Deploy user + checkout
+sudo useradd --system --create-home --home-dir /srv/quai-emissions-db --shell /bin/bash quai
+sudo git clone https://github.com/your-org/quai-emissions-db.git /srv/quai-emissions-db
+sudo chown -R quai:quai /srv/quai-emissions-db
+cd /srv/quai-emissions-db
+sudo -u quai cp .env.local.example .env.local
+sudo -u quai $EDITOR .env.local
+sudo -u quai npm ci && sudo -u quai npm run migrate && sudo -u quai npm run build
+
+# Services + nginx
+sudo cp deploy/quai-emissions-{ingest,dashboard}.service /etc/systemd/system/
+sudo cp deploy/nginx-quai-emissions.conf /etc/nginx/sites-available/quai-emissions
+sudo ln -s /etc/nginx/sites-available/quai-emissions /etc/nginx/sites-enabled/
+sudo $EDITOR /etc/nginx/sites-available/quai-emissions     # set server_name
+sudo systemctl daemon-reload
+sudo systemctl enable --now quai-emissions-ingest quai-emissions-dashboard
+sudo nginx -t && sudo systemctl reload nginx
+
+# TLS
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d dashboard.example.com
+```
+
+[`deploy/README.md`](./deploy/README.md) has the full details, including
+which lines to substitute, the updates workflow (`git pull && npm ci &&
+npm run migrate && npm run build && systemctl restart …`), and a
+troubleshooting table.
+
+### Other hosting paths
+
+- **Vercel** works out of the box for the frontend. Set the same env vars
   in the Vercel project. The `next.config.mjs` redirects survive
-  serverless without configuration.
+  serverless without configuration. The ingest worker still needs a
+  separate long-lived host.
 - **The ingest worker is not serverless-friendly.** Run it as a
-  long-lived process — a small VPS, a Render Worker, or a Railway service
-  with `npm run ingest` as the start command. It expects to be the only
-  writer to `blocks`, `supply_analytics`, `mining_info`, and `rollups_*`
-  tables.
+  long-lived process — the systemd unit above, a Render Worker, a
+  Railway service, etc. It expects to be the only writer to `blocks`,
+  `supply_analytics`, `mining_info`, and `rollups_*` tables.
 - **Postgres connection pool**: `lib/db.ts` uses `max: 10` per Next.js
   instance. With managed Postgres + a serverless deploy, prefer the
   pooled connection URL (Supabase pooler, Neon pooled URL, etc.) so the
