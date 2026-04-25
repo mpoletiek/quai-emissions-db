@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Light theme (default). CSS variables consumed by Recharts props and the
+   .card/.card-title component classes. Tailwind `dark:` prefix handles the
+   rest of the palette. */
+:root {
+  color-scheme: light;
+
+  --background: #fafafc;
+  --foreground: #0f172a;
+
+  --card-bg: #ffffff;
+  --card-border: rgba(15, 23, 42, 0.08);
+
+  --nav-bg: rgba(250, 250, 252, 0.85);
+  --nav-border: rgba(15, 23, 42, 0.08);
+
+  --popover-bg: #ffffff;
+  --popover-border: rgba(15, 23, 42, 0.12);
+  --popover-text: #0f172a;
+
+  /* Chart styling — passed through to Recharts props as `var(--...)` strings
+     so the SVG inherits the current theme at render time. */
+  --chart-grid: rgba(15, 23, 42, 0.08);
+  --chart-axis: rgba(15, 23, 42, 0.55);
+  --chart-axis-muted: rgba(15, 23, 42, 0.4);
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: rgba(15, 23, 42, 0.12);
+  --chart-tooltip-text: #0f172a;
+  --chart-reference-line: rgba(15, 23, 42, 0.3);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0a0b10;
+  --foreground: #e5e7eb;
+
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.1);
+
+  --nav-bg: rgba(10, 11, 16, 0.8);
+  --nav-border: rgba(255, 255, 255, 0.1);
+
+  --popover-bg: #0f1117;
+  --popover-border: rgba(255, 255, 255, 0.1);
+  --popover-text: #e5e7eb;
+
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis: rgba(255, 255, 255, 0.5);
+  --chart-axis-muted: rgba(255, 255, 255, 0.4);
+  --chart-tooltip-bg: #0f1117;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.1);
+  --chart-tooltip-text: #e5e7eb;
+  --chart-reference-line: rgba(255, 255, 255, 0.3);
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100%;
+}
+
+body {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+.card {
+  @apply rounded-xl p-4 shadow-sm backdrop-blur;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+
+.card-title {
+  @apply text-xs font-medium uppercase tracking-wider;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.dark .card-title {
+  color: rgba(255, 255, 255, 0.6);
+}

@@ -1,0 +1,44 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+
+# build
+build
+dist
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# env — ignore ALL variants (.env, .env.local, .env.production, etc.)
+# but keep .example files committed so contributors know what to set.
+.env*
+!.env*.example
+
+# secrets and certs (defensive)
+*.pem
+*.key
+*.crt
+*.cert
+id_rsa*
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# testing / coverage
+coverage
+.nyc_output
+
+# vercel
+.vercel
+
+# OS junk
+.DS_Store
+Thumbs.db
