@@ -17,43 +17,43 @@ import { formatCompact, weiToFloat } from "@/lib/format";
 import { InfoPopover } from "@/components/ui/InfoPopover";
 import {
   BTC_CAP,
-  KNOWN_HALVING_MONTHS,
   bitcoinSupplyAt,
 } from "@/lib/comparisons/bitcoin";
 import {
   QUAI_CAP_DATE,
-  QUAI_CAP_MONTH,
   QUAI_CAP_WEI,
   QUAI_MAINNET_DATE,
-  QUAI_MAINNET_MONTH,
   quaiProjectedSupplyAt,
 } from "@/lib/comparisons/quai-projection";
 
-// EmissionsComparisonChart — overlays QUAI on Bitcoin's emission curve as
-// percentage of each network's cap. Shows historical + projection on one
-// axis from BTC genesis (2009) to 2050. Vertical reference line marks
-// today; everything to the right is projection.
+// EmissionsComparisonChart — overlays QUAI on Bitcoin's emission curve,
+// both aligned to their own genesis. X-axis is "Years since genesis," so
+// year 0 is BTC's 2009 launch on the BTC line and Quai's 2025 launch on
+// the Quai line. This makes the early-emission shape directly comparable
+// at the same x position. Each network gets its own "Now" reference line
+// (BTC at ~17, QUAI at ~1) since they're at very different points in
+// their respective lifecycles.
 //
 // Data sources:
 //   • Bitcoin: static schedule (lib/comparisons/bitcoin.ts).
 //   • Quai historical: anchor pulled from /api/supply (most recent
-//     realized circulating). Pre-anchor we ramp linearly from the mainnet
-//     launch date — at the 41-year x-axis scale the actual daily curve and
-//     a linear ramp are visually indistinguishable.
+//     realized circulating). Pre-anchor we ramp linearly from genesis —
+//     at the multi-decade scale the actual daily curve and a linear ramp
+//     are visually indistinguishable.
 //   • Quai projection: linear from anchor to QUAI_CAP_WEI at QUAI_CAP_DATE.
 
-const CHART_FROM_YEAR = 2009;
-const CHART_TO_YEAR = 2050;
+const BTC_GENESIS_DATE = new Date("2009-01-03T18:15:05Z");
+const CHART_YEARS = 41; // chart length in years-since-genesis
+const STEP_PER_YEAR = 12; // monthly samples
+const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
 const QUAI_CAP_QUAI = weiToFloat(QUAI_CAP_WEI, 0);
 
-function monthsRange(): Date[] {
-  const out: Date[] = [];
-  for (let y = CHART_FROM_YEAR; y <= CHART_TO_YEAR; y++) {
-    for (let m = 0; m < 12; m++) {
-      out.push(new Date(Date.UTC(y, m, 1)));
-    }
-  }
-  return out;
+function offsetDate(base: Date, years: number): Date {
+  return new Date(base.getTime() + years * MS_PER_YEAR);
+}
+
+function yearsBetween(later: Date, earlier: Date): number {
+  return (later.getTime() - earlier.getTime()) / MS_PER_YEAR;
 }
 
 export function EmissionsComparisonChart() {
@@ -80,54 +80,119 @@ export function EmissionsComparisonChart() {
   }, [data]);
 
   const chartData = useMemo(() => {
-    const months = monthsRange();
-    return months.map((d) => {
-      const btc = bitcoinSupplyAt(d);
+    const out: {
+      year: number;
+      btc: number;
+      btcPct: number;
+      quai: number;
+      quaiPct: number;
+      btcDate: string;
+      quaiDate: string;
+    }[] = [];
+    const totalSteps = CHART_YEARS * STEP_PER_YEAR;
+    for (let i = 0; i <= totalSteps; i++) {
+      const year = i / STEP_PER_YEAR;
+      const btcAt = offsetDate(BTC_GENESIS_DATE, year);
+      const quaiAt = offsetDate(QUAI_MAINNET_DATE, year);
+
+      const btc = bitcoinSupplyAt(btcAt);
       const btcPct = (btc / BTC_CAP) * 100;
 
       let quaiSupplyWei: bigint;
-      if (!anchor || d < QUAI_MAINNET_DATE) {
+      if (!anchor) {
         quaiSupplyWei = 0n;
-      } else if (d <= anchor.date) {
-        // Linear ramp from launch → anchor. Visually identical to the daily
-        // curve at this zoom level.
+      } else if (quaiAt <= anchor.date) {
+        // Linear ramp from QUAI genesis → anchor.
         const totalMs = anchor.date.getTime() - QUAI_MAINNET_DATE.getTime();
-        const elapsedMs = d.getTime() - QUAI_MAINNET_DATE.getTime();
+        const elapsedMs = quaiAt.getTime() - QUAI_MAINNET_DATE.getTime();
         const ppm = BigInt(
           Math.floor(Math.max(0, Math.min(1, elapsedMs / totalMs)) * 1_000_000),
         );
         quaiSupplyWei = (anchor.supply * ppm) / 1_000_000n;
       } else {
-        quaiSupplyWei = quaiProjectedSupplyAt(d, anchor);
+        quaiSupplyWei = quaiProjectedSupplyAt(quaiAt, anchor);
       }
       const quai = weiToFloat(quaiSupplyWei, 0);
       const quaiPct = (quai / QUAI_CAP_QUAI) * 100;
 
-      return {
-        date: d.toISOString().slice(0, 7), // YYYY-MM
+      out.push({
+        year,
         btc,
         btcPct,
         quai,
         quaiPct,
-      };
-    });
+        btcDate: btcAt.toISOString().slice(0, 7),
+        quaiDate: quaiAt.toISOString().slice(0, 7),
+      });
+    }
+    return out;
   }, [anchor]);
 
-  const todayMonth = todayIso.slice(0, 7);
+  // Each network's "now" expressed as years-since-its-own-genesis.
+  const btcYearsNow = useMemo(
+    () => yearsBetween(today, BTC_GENESIS_DATE),
+    [today],
+  );
+  const quaiYearsNow = useMemo(
+    () => yearsBetween(today, QUAI_MAINNET_DATE),
+    [today],
+  );
+
+  // QUAI cap reached at year (CAP_DATE - QUAI_GENESIS).
+  const quaiCapYear = yearsBetween(QUAI_CAP_DATE, QUAI_MAINNET_DATE);
+
+  // BTC halving years (relative to BTC genesis).
+  const btcHalvingYears = useMemo(
+    () =>
+      [
+        new Date("2012-11-28T15:24:38Z"),
+        new Date("2016-07-09T16:46:13Z"),
+        new Date("2020-05-11T19:23:43Z"),
+        new Date("2024-04-19T20:09:27Z"),
+      ].map((d) => yearsBetween(d, BTC_GENESIS_DATE)),
+    [],
+  );
 
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>QUAI vs Bitcoin emission curves</CardTitle>
-          <p className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
-            Cumulative supply as a percentage of each network's cap. Vertical
-            line marks today — everything to the right is projection. QUAI
-            caps at 1.4 B by Feb 2029; Bitcoin ~21 M asymptotically by ~2140.
-          </p>
+          <div className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+            <p>
+              Cumulative supply as % of each network's cap, aligned from
+              each genesis (year 0 = launch).
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              <li>
+                <span className="font-medium text-blue-600 dark:text-blue-300">
+                  QUAI
+                </span>
+                {" "}— launched 2025; "Now" line at year ~1; caps at 1.4 B by
+                year ~4.
+              </li>
+              <li>
+                <span className="font-medium text-orange-600 dark:text-orange-300">
+                  Bitcoin
+                </span>
+                {" "}— launched 2009; "Now" line at year ~17; approaches 21 M
+                asymptotically by year ~131.
+              </li>
+            </ul>
+            <p className="mt-1">
+              Same x position = same network age, not same calendar date —
+              that's how the early-emission shapes line up to compare.
+            </p>
+          </div>
         </div>
         <InfoPopover label="About the comparison">
           <p>
+            <span className="font-medium">X-axis</span>: years since each
+            network's genesis. BTC genesis = 2009-01-03; QUAI genesis =
+            2025-01-29. Same x position means same age, not same calendar
+            date — that's how the early-emission shapes line up to compare.
+          </p>
+          <p className="mt-2">
             <span className="font-medium">Bitcoin</span> uses real halving
             timestamps for the four halvings to date and projects subsequent
             halvings at 4-year intervals. Cumulative supply per epoch is
@@ -137,8 +202,8 @@ export function EmissionsComparisonChart() {
             <span className="font-medium">QUAI historical</span> is anchored
             on the most recent <code>quaiSupplyTotal</code> row from{" "}
             <code>/api/supply</code>. Pre-anchor history is linearly ramped
-            from the mainnet launch date — at the 41-year scale this is
-            visually indistinguishable from the daily curve.
+            from QUAI genesis — at the multi-decade scale this is visually
+            indistinguishable from the daily curve.
           </p>
           <p className="mt-2">
             <span className="font-medium">QUAI projection</span> is linear
@@ -158,10 +223,13 @@ export function EmissionsComparisonChart() {
           >
             <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
             <XAxis
-              dataKey="date"
+              type="number"
+              dataKey="year"
+              domain={[0, CHART_YEARS]}
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
-              tickFormatter={(v) => String(v).slice(0, 4)}
-              minTickGap={48}
+              tickFormatter={(v) => `Y${Math.round(Number(v))}`}
+              ticks={[0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40]}
+              minTickGap={32}
             />
             <YAxis
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
@@ -177,23 +245,25 @@ export function EmissionsComparisonChart() {
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              labelFormatter={(v) => String(v)}
+              labelFormatter={(v) => `Year ${Number(v).toFixed(2)} since genesis`}
               formatter={(v, name, item) => {
                 const row = item.payload as {
                   btc: number;
                   quai: number;
                   btcPct: number;
                   quaiPct: number;
+                  btcDate: string;
+                  quaiDate: string;
                 };
                 if (name === "QUAI % of cap") {
                   return [
-                    `${Number(v).toFixed(2)}% (${formatCompact(row.quai)} QUAI)`,
+                    `${Number(v).toFixed(2)}% — ${formatCompact(row.quai)} QUAI (${row.quaiDate})`,
                     name,
                   ];
                 }
                 if (name === "BTC % of cap") {
                   return [
-                    `${Number(v).toFixed(2)}% (${formatCompact(row.btc)} BTC)`,
+                    `${Number(v).toFixed(2)}% — ${formatCompact(row.btc)} BTC (${row.btcDate})`,
                     name,
                   ];
                 }
@@ -202,36 +272,33 @@ export function EmissionsComparisonChart() {
             />
             <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
 
-            {/* "Now" — everything to the right is projection. */}
+            {/* "Now" lines — one per network, at their respective year-since-genesis. */}
             <ReferenceLine
-              x={todayMonth}
-              stroke="var(--chart-axis)"
-              strokeOpacity={0.6}
+              x={btcYearsNow}
+              stroke="#f97316"
+              strokeOpacity={0.7}
               label={{
-                value: "Now",
+                value: `BTC now · Y${btcYearsNow.toFixed(1)}`,
                 position: "insideTopRight",
-                fill: "var(--chart-axis)",
+                fill: "#f97316",
                 fontSize: 10,
               }}
             />
-
-            {/* QUAI mainnet launch — start of QUAI line. */}
             <ReferenceLine
-              x={QUAI_MAINNET_MONTH}
+              x={quaiYearsNow}
               stroke="#3b82f6"
-              strokeOpacity={0.4}
-              strokeDasharray="2 2"
+              strokeOpacity={0.7}
               label={{
-                value: "QUAI mainnet",
+                value: `QUAI now · Y${quaiYearsNow.toFixed(1)}`,
                 position: "insideTopRight",
                 fill: "#3b82f6",
                 fontSize: 10,
               }}
             />
 
-            {/* QUAI cap target — end of QUAI projection. */}
+            {/* QUAI cap target — end of QUAI projection (year ~4). */}
             <ReferenceLine
-              x={QUAI_CAP_MONTH}
+              x={quaiCapYear}
               stroke="#3b82f6"
               strokeOpacity={0.4}
               strokeDasharray="2 2"
@@ -243,11 +310,11 @@ export function EmissionsComparisonChart() {
               }}
             />
 
-            {/* BTC halving events. */}
-            {KNOWN_HALVING_MONTHS.map((m, i) => (
+            {/* BTC halving events at years ~3.9, 7.5, 11.4, 15.3 since BTC genesis. */}
+            {btcHalvingYears.map((y, i) => (
               <ReferenceLine
-                key={m}
-                x={m}
+                key={y}
+                x={y}
                 stroke="#f97316"
                 strokeOpacity={0.35}
                 strokeDasharray="2 2"

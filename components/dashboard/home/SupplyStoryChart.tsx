@@ -62,11 +62,27 @@ export function SupplyStoryChart({
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>QUAI supply story</CardTitle>
-          <p className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
-            The blue area is QUAI in circulation on cyprus1. The orange wedge
-            above is SOAP burn — QUAI that was minted then sent to{" "}
-            <code>0x0050AF…</code>. The full stack is gross minted.
-          </p>
+          <ul className="mt-1 max-w-xl space-y-0.5 text-xs text-slate-900/55 dark:text-white/55">
+            <li>
+              <span className="font-medium text-blue-600 dark:text-blue-300">
+                Realized
+              </span>
+              {" "}— QUAI actually circulating on cyprus1.
+            </li>
+            <li>
+              <span className="font-medium text-orange-600 dark:text-orange-300">
+                SOAP burn
+              </span>
+              {" "}(hatched) — minted then sent to <code>0x0050AF…</code> and
+              subtracted off the top.
+            </li>
+            <li>
+              <span className="font-medium text-slate-900/80 dark:text-white/80">
+                Top of stack
+              </span>
+              {" "}= gross minted (realized + burn).
+            </li>
+          </ul>
         </div>
         <InfoPopover label="About the supply story">
           <p className="font-medium">Two layers</p>
@@ -109,6 +125,31 @@ export function SupplyStoryChart({
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                {/* Diagonal-stripe pattern used as the SOAP-burn area fill.
+                    Visually signals "this would be circulating supply but
+                    has been subtracted off the top via burn" — the stripes
+                    read as "removed/voided" vs the solid blue realized
+                    circulating fill below. */}
+                <pattern
+                  id="soap-burn-stripes"
+                  patternUnits="userSpaceOnUse"
+                  width="6"
+                  height="6"
+                  patternTransform="rotate(45)"
+                >
+                  <rect width="6" height="6" fill="#f97316" fillOpacity={0.18} />
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="6"
+                    stroke="#f97316"
+                    strokeWidth="2.5"
+                    strokeOpacity={0.85}
+                  />
+                </pattern>
+              </defs>
               <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
               <XAxis
                 dataKey="date"
@@ -149,11 +190,12 @@ export function SupplyStoryChart({
               <Area
                 type="monotone"
                 dataKey="burn"
-                name="SOAP burn"
+                name="SOAP burn (subtracted)"
                 stackId="supply"
                 stroke="#f97316"
-                fill="#f97316"
-                fillOpacity={0.65}
+                strokeWidth={1.4}
+                strokeDasharray="4 3"
+                fill="url(#soap-burn-stripes)"
               />
             </AreaChart>
           </ResponsiveContainer>

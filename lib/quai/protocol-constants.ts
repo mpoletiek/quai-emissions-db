@@ -92,3 +92,85 @@ export const PROTOCOL_EVENTS: ProtocolEvent[] = [
 export function getProtocolEvent(id: string): ProtocolEvent | null {
   return PROTOCOL_EVENTS.find((e) => e.id === id) ?? null;
 }
+
+// ─── Coinbase lockup ─────────────────────────────────────────────────────
+// Source: go-quai params/protocol_params.go
+//   • LockupByteToBlockDepth, LockupByteToRewardsMultiple
+//   • CalculateLockupByteRewardsMultiple, CalculateCoinbaseValueWithLockup
+// Quai docs https://docs.qu.ai/guides/client/node confirm Y1/Y5 anchors but
+// round Byte-3 duration to 360 days; source uses 365 × BlocksPerDay.
+
+/** Cyprus1 target block time in seconds. `BlocksPerDay = 86400 / 5`. */
+export const BLOCKS_PER_DAY = 17_280n;
+export const BLOCKS_PER_WEEK = 7n * BLOCKS_PER_DAY;
+export const BLOCKS_PER_MONTH = 30n * BLOCKS_PER_DAY;
+export const BLOCKS_PER_YEAR = 365n * BLOCKS_PER_DAY;
+
+/** Lockup byte → block depth before reward unlocks. Index = byte. */
+export const LOCKUP_BLOCKS: readonly bigint[] = [
+  2n * BLOCKS_PER_WEEK,   // byte 0: 2 weeks   = 241,920
+  3n * BLOCKS_PER_MONTH,  // byte 1: 3 months  = 1,555,200
+  6n * BLOCKS_PER_MONTH,  // byte 2: 6 months  = 3,110,400
+  BLOCKS_PER_YEAR,        // byte 3: 12 months = 6,307,200
+];
+
+/** Reward multiplier anchors per byte: [Y1_anchor, Y5_floor], in 1/100,000.
+ *  Byte 0 has no boost (the go-quai function errors on byte 0 — caller
+ *  short-circuits to value × 1.0). */
+export const LOCKUP_MULTIPLIER_ANCHORS: readonly [bigint, bigint][] = [
+  [100_000n, 100_000n], // byte 0: 1.00× / 1.00× (placeholder; not used)
+  [103_500n, 100_218n], // byte 1: 1.035× → 1.00218×
+  [110_000n, 100_625n], // byte 2: 1.10×  → 1.00625×
+  [125_000n, 101_562n], // byte 3: 1.25×  → 1.01562×
+];
+
+/** Multiplier returned in units of 1/100,000 (so 100,000 = 1.0×). Block
+ *  number is the **zone block number** from cyprus1 genesis — same value
+ *  go-quai's CalculateCoinbaseValueWithLockup receives via
+ *  block.NumberU64(common.ZONE_CTX). */
+export const LOCKUP_MULTIPLIER_UNIT = 100_000n;
+
+/** Multiplier kicks in only at zone block ≥ 2 × BlocksPerMonth. Before that,
+ *  every coinbase pays 1.0× regardless of byte (per go-quai
+ *  CalculateCoinbaseValueWithLockup early-return). */
+export const LOCKUP_MULTIPLIER_ACTIVATION_BLOCK = 2n * BLOCKS_PER_MONTH;
+
+/** Compute the lockup multiplier for a given byte at a given zone block.
+ *  Returns the multiplier in units of `LOCKUP_MULTIPLIER_UNIT` (1/100,000),
+ *  matching go-quai's int representation so chart math stays bigint. */
+export function lockupMultiplierMicros(
+  lockupByte: 0 | 1 | 2 | 3,
+  zoneBlockNumber: bigint,
+): bigint {
+  if (lockupByte === 0) return LOCKUP_MULTIPLIER_UNIT;
+  if (zoneBlockNumber < LOCKUP_MULTIPLIER_ACTIVATION_BLOCK) {
+    return LOCKUP_MULTIPLIER_UNIT;
+  }
+  const [y1, y5] = LOCKUP_MULTIPLIER_ANCHORS[lockupByte];
+  const year = zoneBlockNumber / BLOCKS_PER_YEAR;
+  if (year === 0n) return y1;
+  if (year > 4n) return y5;
+  // Linear interp: at block = BlocksPerYear → Y1, at block = 5×BlocksPerYear → Y5.
+  const a = y5 - y1;
+  const b = 4n * BLOCKS_PER_YEAR;
+  const x = zoneBlockNumber - BLOCKS_PER_YEAR;
+  return (a * x + b * y1) / b;
+}
+
+/** Apply a lockup-byte multiplier to a wei value. Mirrors go-quai's
+ *  CalculateCoinbaseValueWithLockup. */
+export function applyLockupMultiplier(
+  valueWei: bigint,
+  lockupByte: 0 | 1 | 2 | 3,
+  zoneBlockNumber: bigint,
+): bigint {
+  const m = lockupMultiplierMicros(lockupByte, zoneBlockNumber);
+  return (valueWei * m) / LOCKUP_MULTIPLIER_UNIT;
+}
+
+/** Lockup byte → unlock duration in days (rounded down). Convenience for UI
+ *  copy and for shifting cumulative-issued curves into cumulative-unlocked
+ *  space at daily rollup granularity. */
+export function lockupDays(lockupByte: 0 | 1 | 2 | 3): number {
+  return Number(LOCKUP_BLOCKS[lockupByte] / BLOCKS_PER_DAY);
+}

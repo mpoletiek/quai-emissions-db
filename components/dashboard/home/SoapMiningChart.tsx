@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useRollups } from "@/lib/hooks";
 import {
@@ -21,7 +21,35 @@ import {
 import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
 import { InfoPopover } from "@/components/ui/InfoPopover";
-import { SOAP_ACTIVATION_DATE } from "@/lib/quai/protocol-constants";
+import {
+  SOAP_ACTIVATION_DATE,
+  applyLockupMultiplier,
+  lockupDays,
+} from "@/lib/quai/protocol-constants";
+import { cn } from "@/lib/utils";
+
+// Lockup-byte simulation modes. "real" = today's math (no multiplier, no
+// unlock shift). "byte0..3" = "what if every miner picked byte N from
+// genesis" — applies the multiplier to per-block reward and shifts the
+// cumulative curve right by the byte's lockup duration to draw the
+// unlocked-supply line.
+type LockupMode = "mined" | 0 | 1 | 2 | 3;
+
+const LOCKUP_LABELS: Record<Exclude<LockupMode, "mined">, string> = {
+  0: "14 days",
+  1: "90 days",
+  2: "180 days",
+  3: "365 days",
+};
+
+// Year-1 reward bonus per byte, used in the explainer copy. Y1 anchor
+// in % over 1.0×, sourced from LOCKUP_MULTIPLIER_ANCHORS.
+const LOCKUP_BONUS_PCT: Record<Exclude<LockupMode, "mined">, string> = {
+  0: "0%",
+  1: "+3.5%",
+  2: "+10%",
+  3: "+25%",
+};
 
 // SoapMiningChart — cumulative QUAI mined and cumulative SOAP burn since
 // SOAP activation, both zero-anchored at the launch date so the gap
@@ -55,20 +83,24 @@ import { SOAP_ACTIVATION_DATE } from "@/lib/quai/protocol-constants";
 export function SoapMiningChart({ to }: { to: string }) {
   const from = SOAP_ACTIVATION_DATE;
   const { data, isLoading, error } = useRollups({ period: "day", from, to });
+  const [mode, setMode] = useState<LockupMode>("mined");
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    let cumMined = 0n;
+    // Track BOTH the actual (no-multiplier) cumulative and the simulation
+    // cumulative in parallel. Actual is the reference line always shown so
+    // users can see issued > actual when sim multiplier > 1.
+    let cumActual = 0n;
+    let cumSim = 0n;
     let burnAnchor: bigint | null = null;
-    // Anchor the curve at zero on SOAP launch date so the y-axis baseline
-    // is unambiguous.
-    const out: {
+    type Row = {
       date: string;
-      mined: number;
-      burned: number;
-      net: number;
-    }[] = [
-      { date: SOAP_ACTIVATION_DATE, mined: 0, burned: 0, net: 0 },
+      cumActual: bigint;
+      cumSim: bigint;
+      burned: bigint;
+    };
+    const rows: Row[] = [
+      { date: SOAP_ACTIVATION_DATE, cumActual: 0n, cumSim: 0n, burned: 0n },
     ];
     for (const r of data) {
       // Capture the burn anchor on the very first row regardless of mining
@@ -88,39 +120,138 @@ export function SoapMiningChart({ to }: { to: string }) {
       const baseSum = nz(r.baseBlockRewardSum);
       const wsReward = nz(r.workshareRewardAvg);
       const wsTotal = BigInt(r.workshareTotal);
-      const totalMiningWei = baseSum + wsReward * wsTotal;
+      const baseTotalWei = baseSum + wsReward * wsTotal;
+
+      // Sim total: apply multiplier when not in "mined" or byte-0 mode.
+      // The multiplier depends on the zone block number; use the period's
+      // last_block as the representative (sub-percent error within a Y1-
+      // anchor day, small even mid-decay).
+      let simTotalWei = baseTotalWei;
+      if (mode !== "mined" && mode !== 0) {
+        simTotalWei = applyLockupMultiplier(baseTotalWei, mode, BigInt(r.lastBlock));
+      }
+
       const winnerQuai = BigInt(r.winnerQuaiCount);
       const blocks = BigInt(r.blockCount);
-      const quaiEmitWei =
-        blocks > 0n ? (totalMiningWei * winnerQuai) / blocks : 0n;
-      cumMined += quaiEmitWei;
+      const actualEmit =
+        blocks > 0n ? (baseTotalWei * winnerQuai) / blocks : 0n;
+      const simEmit =
+        blocks > 0n ? (simTotalWei * winnerQuai) / blocks : 0n;
+      cumActual += actualEmit;
+      cumSim += simEmit;
 
       const burnSinceSoap = r.burnClose - (burnAnchor ?? 0n);
-      const netWei = cumMined - burnSinceSoap;
-
-      out.push({
+      rows.push({
         date: r.periodStart,
-        mined: weiToFloat(cumMined, 0),
-        burned: weiToFloat(burnSinceSoap, 0),
-        net: weiToFloat(netWei, 0),
+        cumActual,
+        cumSim,
+        burned: burnSinceSoap,
       });
     }
-    return out;
-  }, [data]);
+
+    // Build the unlocked series by shifting the simulated-issued curve
+    // right by the byte's lockup duration in days. Daily granularity makes
+    // this a simple index lookup (off by ≤1 day vs exact block-count math).
+    const shiftDays = mode === "mined" ? 0 : lockupDays(mode);
+    return rows.map((row, i) => {
+      const unlockedSrcIdx = i - shiftDays;
+      const cumUnlocked =
+        unlockedSrcIdx >= 0 ? rows[unlockedSrcIdx].cumSim : 0n;
+      const netWei = row.cumActual - row.burned;
+      return {
+        date: row.date,
+        // In Mined mode, the headline blue line IS the actual mined value.
+        // In sim mode, the headline blue line is the multiplier-scaled
+        // issued, and `actual` becomes the faint reference line.
+        mined: weiToFloat(row.cumSim, 0),
+        actual: weiToFloat(row.cumActual, 0),
+        unlocked: weiToFloat(cumUnlocked, 0),
+        burned: weiToFloat(row.burned, 0),
+        net: weiToFloat(netWei, 0),
+      };
+    });
+  }, [data, mode]);
 
   const last = chartData[chartData.length - 1];
+  const showSimSeries = mode !== "mined";
 
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>QUAI mining vs SOAP burn since SOAP</CardTitle>
-          <p className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
-            Cumulative QUAI paid out via mining (blue) and cumulative SOAP
-            burn (orange), both zero-anchored at SOAP activation (
-            {SOAP_ACTIVATION_DATE}). The gap between them is the net
-            mining contribution to circulating supply.
-          </p>
+          {showSimSeries ? (
+            <div className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+              <p>
+                <span className="font-medium">What-if:</span> every miner
+                locks rewards for{" "}
+                <span className="font-medium">{LOCKUP_LABELS[mode]}</span>{" "}
+                from genesis ({LOCKUP_BONUS_PCT[mode]} reward bonus, year 1).
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                <li>
+                  <span className="font-medium text-blue-600 dark:text-blue-300">
+                    Issued (sim)
+                  </span>
+                  {" "}— cumulative, multiplier-scaled.
+                </li>
+                <li>
+                  <span className="font-medium text-purple-600 dark:text-purple-300">
+                    Unlocked (sim)
+                  </span>
+                  {" "}— issued, shifted right by {lockupDays(mode)} days.
+                </li>
+                <li>
+                  <span className="font-medium text-orange-600 dark:text-orange-300">
+                    SOAP burn
+                  </span>
+                  {" "}— same as Mined mode.
+                </li>
+                <li>
+                  <span className="font-medium text-slate-700 dark:text-white/70">
+                    Actual mined
+                  </span>
+                  {" "}(grey dashed) — no-multiplier baseline for comparison.
+                </li>
+              </ul>
+              <p className="mt-1">
+                Gap between issued and unlocked = in-flight overhang.
+                Longer locks earn more — see bonuses on each toggle.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+              <p>
+                Both lines zero-anchored at SOAP activation
+                ({SOAP_ACTIVATION_DATE}).
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                <li>
+                  <span className="font-medium text-blue-600 dark:text-blue-300">
+                    Mined
+                  </span>
+                  {" "}— cumulative QUAI paid out via mining.
+                </li>
+                <li>
+                  <span className="font-medium text-orange-600 dark:text-orange-300">
+                    SOAP burn
+                  </span>
+                  {" "}— cumulative since SOAP day.
+                </li>
+                <li>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-300">
+                    Net
+                  </span>
+                  {" "}(dashed) — mined − burned, the net contribution to
+                  circulating.
+                </li>
+              </ul>
+              <p className="mt-1">
+                Try a lockup toggle to model what changes if every miner picks
+                that period.
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <SamplingFootnote kind="averaged" />
@@ -141,17 +272,57 @@ export function SoapMiningChart({ to }: { to: string }) {
               starts at zero and accumulates only burns post-activation.
             </p>
             <p className="mt-2">
-              The supply-story chart above uses{" "}
-              <code>quaiSupplyTotal</code>, which folds in conversions and
-              genesis unlocks. This chart strips those out so the lines
-              track pure miner issuance and pure SOAP-burn flow since the
-              activation moment.
+              <span className="font-medium">Lockup simulation</span>: the
+              byte toggle re-runs the chart as if every miner had elected
+              that lockup byte from cyprus1 genesis. Multiplier comes from
+              go-quai's <code>CalculateLockupByteRewardsMultiple</code> at
+              the period's last block (Y1 anchor through code year 0,
+              linearly decaying to a Y5 floor over years 1–4). The
+              "unlocked" line shifts the cumulative-issued curve right by
+              the byte's lockup duration; the gap is the lockup overhang.
             </p>
             <p className="mt-2 text-slate-900/55 dark:text-white/55">
-              Qi-winner blocks pay their reward in Qi (not QUAI), so they
-              don't add to the mined line.
+              Real chain has heterogeneous miner byte choices and matures
+              into <code>quaiSupplyTotal</code> at unlock time. The supply
+              story chart above is the actual matured side.
             </p>
           </InfoPopover>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+          Lockup scenario
+        </span>
+        <div
+          role="tablist"
+          aria-label="Lockup scenario"
+          className="inline-flex items-center gap-0.5 rounded-md border border-slate-900/10 p-0.5 dark:border-white/10"
+        >
+          {(["mined", 0, 1, 2, 3] as const).map((opt) => {
+            const active = opt === mode;
+            const label =
+              opt === "mined"
+                ? "Mined"
+                : `${LOCKUP_LABELS[opt]} (${LOCKUP_BONUS_PCT[opt]})`;
+            return (
+              <button
+                key={String(opt)}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMode(opt)}
+                className={cn(
+                  "rounded px-2 py-0.5 text-xs transition",
+                  active
+                    ? "bg-slate-900/10 text-slate-900 dark:bg-white/15 dark:text-white"
+                    : "text-slate-700 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -200,14 +371,40 @@ export function SoapMiningChart({ to }: { to: string }) {
               />
               <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
               <ProtocolEventLines visibleFrom={from} visibleTo={to} />
+              {showSimSeries && (
+                <Line
+                  type="monotone"
+                  dataKey="actual"
+                  name="Cumulative QUAI mined (actual)"
+                  stroke="var(--chart-axis)"
+                  strokeOpacity={0.55}
+                  strokeWidth={1.2}
+                  strokeDasharray="3 3"
+                  dot={false}
+                />
+              )}
               <Line
                 type="monotone"
                 dataKey="mined"
-                name="Cumulative QUAI mined"
+                name={
+                  showSimSeries
+                    ? "Cumulative issued (sim)"
+                    : "Cumulative QUAI mined"
+                }
                 stroke="#3b82f6"
                 strokeWidth={1.6}
                 dot={false}
               />
+              {showSimSeries && (
+                <Line
+                  type="monotone"
+                  dataKey="unlocked"
+                  name="Cumulative unlocked (sim)"
+                  stroke="#a855f7"
+                  strokeWidth={1.6}
+                  dot={false}
+                />
+              )}
               <Line
                 type="monotone"
                 dataKey="burned"
@@ -216,15 +413,17 @@ export function SoapMiningChart({ to }: { to: string }) {
                 strokeWidth={1.6}
                 dot={false}
               />
-              <Line
-                type="monotone"
-                dataKey="net"
-                name="Net (mined − burned)"
-                stroke="#10b981"
-                strokeWidth={1.2}
-                strokeDasharray="3 3"
-                dot={false}
-              />
+              {!showSimSeries && (
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  name="Net (mined − burned)"
+                  stroke="#10b981"
+                  strokeWidth={1.2}
+                  strokeDasharray="3 3"
+                  dot={false}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -234,24 +433,41 @@ export function SoapMiningChart({ to }: { to: string }) {
         <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-slate-900/50 dark:text-white/50">
           <span>Latest {formatPeriodDate(last.date)}:</span>
           <span>
-            mined{" "}
+            {showSimSeries ? "issued" : "mined"}{" "}
             <span className="font-mono text-blue-600 dark:text-blue-300">
               {formatCompact(last.mined)} QUAI
             </span>
           </span>
+          {showSimSeries && (
+            <span>
+              unlocked{" "}
+              <span className="font-mono text-purple-600 dark:text-purple-300">
+                {formatCompact(last.unlocked)} QUAI
+              </span>
+            </span>
+          )}
           <span>
             burned{" "}
             <span className="font-mono text-orange-600 dark:text-orange-300">
               {formatCompact(last.burned)} QUAI
             </span>
           </span>
-          <span>
-            net{" "}
-            <span className="font-mono text-emerald-600 dark:text-emerald-300">
-              {last.net >= 0 ? "+" : ""}
-              {formatCompact(last.net)} QUAI
+          {showSimSeries ? (
+            <span>
+              overhang{" "}
+              <span className="font-mono text-slate-700 dark:text-white/70">
+                {formatCompact(last.mined - last.unlocked)} QUAI
+              </span>
             </span>
-          </span>
+          ) : (
+            <span>
+              net{" "}
+              <span className="font-mono text-emerald-600 dark:text-emerald-300">
+                {last.net >= 0 ? "+" : ""}
+                {formatCompact(last.net)} QUAI
+              </span>
+            </span>
+          )}
         </div>
       )}
     </Card>

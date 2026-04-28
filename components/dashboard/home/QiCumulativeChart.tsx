@@ -50,10 +50,15 @@ export function QiCumulativeChart({
   return (
     <Card>
       <CardTitle>Qi cumulative supply</CardTitle>
-      <p className="mt-1 max-w-md text-xs text-slate-900/55 dark:text-white/55">
-        Qi has no burn or skip mechanism. The line is the running total of
-        every Qi minted on cyprus1.
-      </p>
+      <ul className="mt-1 max-w-md space-y-0.5 text-xs text-slate-900/55 dark:text-white/55">
+        <li>
+          <span className="font-medium text-emerald-600 dark:text-emerald-300">
+            Green line
+          </span>
+          {" "}— running total of every Qi minted on cyprus1.
+        </li>
+        <li>No burn, no skip mechanism — monotonically rising.</li>
+      </ul>
 
       <div className="mt-3 h-56">
         {isLoading || !data ? (
