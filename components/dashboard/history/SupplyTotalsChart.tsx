@@ -13,7 +13,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -22,6 +21,14 @@ import {
   YAxis,
 } from "recharts";
 import { ProtocolEventLines } from "./ProtocolEventLines";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const SUPPLY_TOTALS_LEGEND: ChartLegendItem[] = [
+  { label: "QUAI supply", color: "#3b82f6" },
+  { label: "QI supply", color: "#10b981" },
+];
 
 export function SupplyTotalsChart() {
   const { params } = useHistoryParams();
@@ -36,7 +43,7 @@ export function SupplyTotalsChart() {
     return (
       <Card>
         <CardTitle>Supply Totals</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -118,6 +125,7 @@ export function SupplyTotalsChart() {
           </InfoPopover>
         </div>
       </div>
+      <ChartLegend items={SUPPLY_TOTALS_LEGEND} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -125,11 +133,17 @@ export function SupplyTotalsChart() {
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={formatPeriodDate}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             <YAxis
@@ -137,6 +151,8 @@ export function SupplyTotalsChart() {
               scale={logScale ? "log" : "auto"}
               domain={logScale ? ["auto", "auto"] : undefined}
               tick={{ fill: "rgba(59,130,246,0.8)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={64}
               tickFormatter={formatCompact}
               allowDataOverflow={logScale}
@@ -147,23 +163,19 @@ export function SupplyTotalsChart() {
               scale={logScale ? "log" : "auto"}
               domain={logScale ? ["auto", "auto"] : undefined}
               tick={{ fill: "rgba(16,185,129,0.9)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={64}
               tickFormatter={formatCompact}
               allowDataOverflow={logScale}
             />
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => formatPeriodDate(String(v))}
-              formatter={(v, name) => [Number(v).toLocaleString(), String(name)]}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => formatPeriodDate(String(v))}
+                  formatter={(v, name) => [Number(v).toLocaleString(), String(name)]}
+                />
+              }
             />
             <ProtocolEventLines
               visibleFrom={params.from}
@@ -178,6 +190,9 @@ export function SupplyTotalsChart() {
               stroke="#3b82f6"
               dot={false}
               strokeWidth={1.5}
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
             <Line
               yAxisId="qi"
@@ -187,6 +202,9 @@ export function SupplyTotalsChart() {
               stroke="#10b981"
               dot={false}
               strokeWidth={1.5}
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>

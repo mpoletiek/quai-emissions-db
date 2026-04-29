@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HomeHero } from "@/components/dashboard/home/HomeHero";
 import { SupplyStoryChart } from "@/components/dashboard/home/SupplyStoryChart";
 import { SoapMiningChart } from "@/components/dashboard/home/SoapMiningChart";
@@ -35,77 +35,59 @@ export default function DashboardHomePage() {
   const flagshipFrom = timeframeToFromIso(tf) ?? MAINNET_DATE;
   const flagshipTo = todayIso();
 
+  useEffect(() => {
+    document.title = "Quai · Home";
+  }, []);
+
   return (
     <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-10">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Quai Emissions Dashboard
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-900/60 dark:text-white/60">
-          What's actually circulating, what's been burned, and what miners are
-          choosing right now. Data on{" "}
-          <code className="text-slate-900/80 dark:text-white/80">cyprus1</code>,
-          bucketed in UTC.
-        </p>
-      </header>
-
       <div className="mb-5">
         <HomeHero from={HERO_FROM} to={todayIso()} />
       </div>
 
-      <div className="mb-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Latest events
-        </h2>
-        <p className="mt-1 text-xs text-slate-900/55 dark:text-white/55">
-          Two recent protocol changes shaping QUAI's emissions and eventual
-          supply.
-        </p>
-      </div>
+      <details className="group mb-6 overflow-hidden rounded-lg border border-amber-400/50 border-l-4 border-l-amber-400 bg-amber-50/50 dark:border-amber-500/40 dark:border-l-amber-500 dark:bg-amber-500/[0.04]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-baseline gap-3">
+            <span className="text-sm font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              Recent Catalysts
+            </span>
+            <span className="text-xs text-slate-900/60 dark:text-white/60">
+              Two protocol changes reshaping QUAI's emissions and eventual
+              supply.
+            </span>
+          </div>
+          <svg
+            className="h-4 w-4 shrink-0 text-amber-600 transition-transform group-open:rotate-90 dark:text-amber-400"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path
+              fillRule="evenodd"
+              d="M7.21 5.21a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 11-1.06-1.06L10.94 10 7.21 6.27a.75.75 0 010-1.06z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </summary>
+        <div className="grid grid-cols-1 gap-4 px-4 pb-4 lg:grid-cols-2">
+          <SoapCallout />
+          <SingularityCallout />
+        </div>
+      </details>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SoapCallout />
-        <SingularityCallout />
-      </div>
-
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Supply story
-        </h2>
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+          Range
+        </span>
         <TimeframeToggle value={tf} onChange={setTf} />
       </div>
 
-      <div className="mb-6">
+      <div className="fade-in-stagger space-y-6">
         <SupplyStoryChart from={flagshipFrom} to={flagshipTo} />
-      </div>
-
-      <div className="mb-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Qi cumulative supply
-        </h2>
-      </div>
-
-      <div className="mb-6">
         <QiCumulativeChart from={flagshipFrom} to={flagshipTo} />
-      </div>
-
-      <div className="mb-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Mining issuance since SOAP
-        </h2>
-      </div>
-
-      <div className="mb-6">
         <SoapMiningChart to={flagshipTo} />
+        <EmissionsComparisonChart />
       </div>
-
-      <div className="mb-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Emission curve vs Bitcoin
-        </h2>
-      </div>
-
-      <EmissionsComparisonChart />
     </main>
   );
 }

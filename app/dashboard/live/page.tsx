@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LiveHero } from "@/components/dashboard/live/LiveHero";
 import { BlockIntervalScatter } from "@/components/dashboard/live/BlockIntervalScatter";
 import { RecentBlocksFeed } from "@/components/dashboard/live/RecentBlocksFeed";
@@ -23,54 +23,56 @@ import {
 export default function DashboardLivePage() {
   const [window, setWindow] = useState<WindowSize>(2000);
 
+  useEffect(() => {
+    document.title = "Quai · Live";
+  }, []);
+
   return (
     <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-10">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Live</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-900/60 dark:text-white/60">
-            Chain head, block cadence, and the reorg log on{" "}
-            <code className="text-slate-900/80 dark:text-white/80">cyprus1</code>.
-            Refreshes every 30–60 seconds.
-          </p>
-        </div>
-        <WindowSelector value={window} onChange={setWindow} />
-      </header>
-
       <div className="mb-5">
         <LiveHero />
       </div>
 
-      <div className="mb-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Block cadence
-        </h2>
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+          Window
+        </span>
+        <WindowSelector value={window} onChange={setWindow} />
       </div>
 
-      <div className="mb-6">
+      <div className="fade-in-stagger space-y-6">
         <BlockIntervalScatter window={Math.min(window, 1000)} />
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RecentBlocksFeed limit={20} />
-        <ReorgLogTable limit={25} />
-      </div>
-
-      <div className="mt-8 mb-3">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-900/60 dark:text-white/60">
-          Live emissions
-        </h2>
-      </div>
-
-      <div className="space-y-4">
-        <AlgorithmPanel />
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <CumulativeEmissionsChart limit={window} />
-          <NetSupplyChart limit={window} />
-          <MintActivityChart limit={window} />
-          <ExchangeRateChart limit={window} />
-          <EmissionsPerBlockChart limit={window} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <RecentBlocksFeed limit={20} />
+          <ReorgLogTable limit={25} />
         </div>
+
+        {/* Quarantined v1 grid — pre-Phase-1 visualizations kept for parity
+            but collapsed by default to keep the new design surface clean.
+            Slate accent (vs amber for "important callout") signals "older /
+            less prominent" rather than "needs attention". */}
+        <details className="group rounded-lg border border-slate-900/10 bg-slate-900/[0.02] dark:border-white/10 dark:bg-white/[0.02]">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-slate-900/80 hover:text-slate-900 dark:text-white/80 dark:hover:text-white">
+            <span className="mr-2 inline-block transition-transform group-open:rotate-90">
+              ›
+            </span>
+            Legacy v1 charts
+            <span className="ml-2 text-xs font-normal text-slate-900/55 dark:text-white/55">
+              Pre-Phase-1 visualizations, kept for parity
+            </span>
+          </summary>
+          <div className="space-y-4 px-4 pb-4 pt-2">
+            <AlgorithmPanel />
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <CumulativeEmissionsChart limit={window} />
+              <NetSupplyChart limit={window} />
+              <MintActivityChart limit={window} />
+              <ExchangeRateChart limit={window} />
+              <EmissionsPerBlockChart limit={window} />
+            </div>
+          </div>
+        </details>
       </div>
     </main>
   );

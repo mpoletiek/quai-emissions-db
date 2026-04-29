@@ -8,7 +8,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,6 +15,16 @@ import {
 } from "recharts";
 import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const ALGO_COMPOSITION_LEGEND = [
+  { label: "KawPoW", color: "#3b82f6" },
+  { label: "SHA", color: "#f97316" },
+  { label: "Scrypt", color: "#10b981" },
+  { label: "ProgPoW (legacy)", color: "#94a3b8" },
+];
 
 // AlgoCompositionChart — flagship for /dashboard/mining.
 // 100%-normalized stacked area showing the relative share of workshares
@@ -57,7 +66,7 @@ export function AlgoCompositionChart({
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>SOAP algorithm composition</CardTitle>
-          <p className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+          <p className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
             Daily share of workshares by algorithm. KawPoW seals each block;
             KawPoW also merge-mines from RVN; SHA contributes via merge-mining
             from BCH; Scrypt from LTC and DOGE.
@@ -66,9 +75,11 @@ export function AlgoCompositionChart({
         <SamplingFootnote kind="extrapolated" />
       </div>
 
-      <div className="mt-4 h-72 sm:h-80">
+      <ChartLegend items={ALGO_COMPOSITION_LEGEND} className="mt-3" />
+
+      <div className="mt-3 h-72 sm:h-80">
         {isLoading || !data ? (
-          <div className="h-full animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
         ) : data.length === 0 ? (
@@ -78,31 +89,35 @@ export function AlgoCompositionChart({
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatPeriodDate}
+                tickLine={false}
+                axisLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={(v) => `${v}%`}
                 domain={[0, 100]}
+                tickLine={false}
+                axisLine={false}
                 width={48}
               />
               <Tooltip
-                contentStyle={{
-                  background: "var(--chart-tooltip-bg)",
-                  color: "var(--chart-tooltip-text)",
-                  border: "1px solid var(--chart-tooltip-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                labelFormatter={(v) => formatPeriodDate(String(v))}
-                formatter={(v, name) => [`${Number(v).toFixed(1)}%`, String(name)]}
+                content={
+                  <ChartTooltip
+                    labelFormatter={(v) => formatPeriodDate(String(v))}
+                    formatter={(v, name) => [`${Number(v).toFixed(1)}%`, name]}
+                  />
+                }
               />
-              <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
               <ProtocolEventLines visibleFrom={from} visibleTo={to} />
               <Area
                 type="monotone"
@@ -112,6 +127,9 @@ export function AlgoCompositionChart({
                 stroke="#3b82f6"
                 fill="#3b82f6"
                 fillOpacity={0.7}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
               <Area
                 type="monotone"
@@ -121,6 +139,9 @@ export function AlgoCompositionChart({
                 stroke="#f97316"
                 fill="#f97316"
                 fillOpacity={0.7}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
               <Area
                 type="monotone"
@@ -130,6 +151,9 @@ export function AlgoCompositionChart({
                 stroke="#10b981"
                 fill="#10b981"
                 fillOpacity={0.7}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
               <Area
                 type="monotone"
@@ -139,6 +163,9 @@ export function AlgoCompositionChart({
                 stroke="#94a3b8"
                 fill="#94a3b8"
                 fillOpacity={0.45}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             </AreaChart>
           </ResponsiveContainer>

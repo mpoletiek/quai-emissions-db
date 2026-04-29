@@ -10,7 +10,7 @@ import {
 
 // HomeHero — five KPI cards leading the dashboard home page.
 //
-//   [DOMINANT] Realized circulating QUAI    (live, from /api/supply)
+//   [DOMINANT] Realized circulating QUAI    (live, from /api/supply, +14d sparkline)
 //   • Total SOAP burn                       (live)
 //   • Net issuance · 7d                     (derived from 14d window)
 //   • Genesis premine                       (static constant)
@@ -29,19 +29,33 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     include: ["qi", "burn"],
   });
 
-  const { latest, sevenDayDelta } = useMemo(() => {
+  const { latest, sevenDayDelta, sparkData } = useMemo(() => {
     if (!data || data.length === 0) {
-      return { latest: null, sevenDayDelta: null };
+      return { latest: null, sevenDayDelta: null, sparkData: [] as number[] };
     }
     const latest = data[data.length - 1];
     const sevenBackIdx = Math.max(0, data.length - 1 - 7);
     const baseline = data[sevenBackIdx];
     const sevenDayDelta =
       latest.realizedCirculatingQuai - baseline.realizedCirculatingQuai;
-    return { latest, sevenDayDelta };
+    // 14-day sparkline: the same window the hook fetched. Convert wei→float
+    // once; MiniSparkline auto-scales y to data range.
+    const sparkData = data.map((r) => weiToFloat(r.realizedCirculatingQuai, 0));
+    return { latest, sevenDayDelta, sparkData };
   }, [data]);
 
   const loading = !latest;
+
+  const realizedFloat = latest
+    ? weiToFloat(latest.realizedCirculatingQuai, 0)
+    : undefined;
+  const qiFloat =
+    latest?.qiTotalEnd != null ? qitsToFloat(latest.qiTotalEnd, 0) : undefined;
+  const burnFloat = latest
+    ? weiToFloat(latest.burnClose ?? 0n, 0)
+    : undefined;
+  const netFloat =
+    sevenDayDelta == null ? undefined : weiToFloat(sevenDayDelta, 0);
 
   const dominant: HeroCard = {
     id: "realized",
@@ -56,8 +70,11 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     ) : (
       "—"
     ),
+    numericValue: realizedFloat,
     sub: "On-chain quaiSupplyTotal for cyprus1, already net of SOAP burn.",
     loading,
+    accent: "blue",
+    sparkline: sparkData.length >= 2 ? { data: sparkData } : undefined,
   };
 
   const qi: HeroCard = {
@@ -73,8 +90,10 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     ) : (
       "—"
     ),
+    numericValue: qiFloat,
     sub: "Cumulative Qi minted on cyprus1.",
     loading,
+    accent: "emerald",
   };
 
   const burn: HeroCard = {
@@ -90,8 +109,10 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
     ) : (
       "—"
     ),
+    numericValue: burnFloat,
     sub: "balanceOf(0x0050AF…) at last close.",
     loading,
+    accent: "orange",
   };
 
   const netSign =
@@ -118,12 +139,16 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
           </span>
         </>
       ),
+    // Count-up uses absolute magnitude so the sign character in `value`
+    // remains a static prefix; magnitude tweens naturally.
+    numericValue: netFloat == null ? undefined : Math.abs(netFloat),
     sub: "Change in realized circulating over the last 7 days.",
     delta:
       netSign == null
         ? undefined
         : { sign: netSign as "up" | "down" | "flat", text: "7d" },
     loading,
+    accent: "emerald",
   };
 
   const premine: HeroCard = {
@@ -137,7 +162,9 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
         </span>
       </>
     ),
+    numericValue: weiToFloat(GENESIS_PREMINE_QUAI, 0),
     sub: "Allocated at block 0; vests over time.",
+    accent: "slate",
   };
 
   const skip: HeroCard = {
@@ -151,7 +178,9 @@ export function HomeHero({ from, to }: { from: string; to: string }) {
         </span>
       </>
     ),
+    numericValue: weiToFloat(SINGULARITY_SKIP_QUAI, 0),
     sub: "Future unlocks eliminated 2026-03-19.",
+    accent: "amber",
   };
 
   return (

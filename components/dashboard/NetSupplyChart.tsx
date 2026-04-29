@@ -7,12 +7,21 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const NET_SUPPLY_LEGEND: ChartLegendItem[] = [
+  { label: "QUAI mint", color: "#3b82f6" },
+  { label: "QUAI burn", color: "#ef4444" },
+  { label: "QI mint", color: "#10b981" },
+  { label: "QI burn", color: "#f97316" },
+];
 
 /**
  * Shows per-block net mint (added - removed) for both tokens.
@@ -25,7 +34,7 @@ export function NetSupplyChart({ limit = 500 }: { limit?: number }) {
     return (
       <Card>
         <CardTitle>Per-Block Net Mint / Burn</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -68,6 +77,7 @@ export function NetSupplyChart({ limit = 500 }: { limit?: number }) {
           Σ QI +{totals.qiMint.toFixed(3)} / {totals.qiBurn.toFixed(3)}
         </div>
       </div>
+      <ChartLegend items={NET_SUPPLY_LEGEND} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -75,39 +85,45 @@ export function NetSupplyChart({ limit = 500 }: { limit?: number }) {
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="block"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => "#" + String(v).slice(-4)}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             <YAxis
               yAxisId="q"
               tick={{ fill: "rgba(59,130,246,0.8)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={60}
             />
             <YAxis
               yAxisId="qi"
               orientation="right"
               tick={{ fill: "rgba(16,185,129,0.9)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={60}
             />
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => `Block #${Number(v).toLocaleString()}`}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => `Block #${Number(v).toLocaleString()}`}
+                />
+              }
             />
-            <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
-            <Bar yAxisId="q" dataKey="quaiMint" stackId="q" fill="#3b82f6" name="QUAI mint" />
-            <Bar yAxisId="q" dataKey="quaiBurn" stackId="q" fill="#ef4444" name="QUAI burn" />
-            <Bar yAxisId="qi" dataKey="qiMint" stackId="qi" fill="#10b981" name="QI mint" />
-            <Bar yAxisId="qi" dataKey="qiBurn" stackId="qi" fill="#f97316" name="QI burn" />
+            <Bar yAxisId="q" dataKey="quaiMint" stackId="q" fill="#3b82f6" name="QUAI mint" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar yAxisId="q" dataKey="quaiBurn" stackId="q" fill="#ef4444" name="QUAI burn" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar yAxisId="qi" dataKey="qiMint" stackId="qi" fill="#10b981" name="QI mint" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar yAxisId="qi" dataKey="qiBurn" stackId="qi" fill="#f97316" name="QI burn" isAnimationActive animationDuration={500} animationEasing="ease-out" />
           </BarChart>
         </ResponsiveContainer>
       </div>

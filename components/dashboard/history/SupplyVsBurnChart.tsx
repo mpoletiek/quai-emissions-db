@@ -10,7 +10,6 @@ import {
 } from "@/lib/format";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -19,6 +18,9 @@ import {
   YAxis,
 } from "recharts";
 import { ProtocolEventLines } from "./ProtocolEventLines";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 export function SupplyVsBurnChart() {
   const { params } = useHistoryParams();
@@ -37,7 +39,7 @@ export function SupplyVsBurnChart() {
             ? `QUAI supply vs cumulative burn · since ${params.rebaseLabel}`
             : "QUAI supply vs cumulative burn"}
         </CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -88,6 +90,17 @@ export function SupplyVsBurnChart() {
   const supplyDelta = last.supply - first.supply;
   const burnDelta = last.burn - first.burn;
 
+  const legend: ChartLegendItem[] = [
+    {
+      label: rebased ? "Δ circulating QUAI" : "Circulating QUAI (left)",
+      color: "#3b82f6",
+    },
+    {
+      label: rebased ? "Cumulative SOAP burn" : "Cumulative SOAP burn (right)",
+      color: "#ef4444",
+    },
+  ];
+
   return (
     <Card>
       <div className="flex items-center justify-between">
@@ -126,6 +139,7 @@ export function SupplyVsBurnChart() {
           </InfoPopover>
         </div>
       </div>
+      <ChartLegend items={legend} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -133,11 +147,17 @@ export function SupplyVsBurnChart() {
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={formatPeriodDate}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             {rebased ? (
@@ -148,6 +168,8 @@ export function SupplyVsBurnChart() {
               <YAxis
                 yAxisId="supply"
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
                 width={64}
                 tickFormatter={formatCompact}
                 domain={["auto", "auto"]}
@@ -157,6 +179,8 @@ export function SupplyVsBurnChart() {
                 <YAxis
                   yAxisId="supply"
                   tick={{ fill: "rgba(59,130,246,0.9)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
                   width={64}
                   tickFormatter={formatCompact}
                   domain={["auto", "auto"]}
@@ -165,6 +189,8 @@ export function SupplyVsBurnChart() {
                   yAxisId="burn"
                   orientation="right"
                   tick={{ fill: "rgba(239,68,68,0.9)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
                   width={64}
                   tickFormatter={formatCompact}
                   domain={["auto", "auto"]}
@@ -172,21 +198,15 @@ export function SupplyVsBurnChart() {
               </>
             )}
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => formatPeriodDate(String(v))}
-              formatter={(v, name) => [
-                `${Number(v).toLocaleString()} QUAI`,
-                String(name),
-              ]}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => formatPeriodDate(String(v))}
+                  formatter={(v, name) => [
+                    `${Number(v).toLocaleString()} QUAI`,
+                    String(name),
+                  ]}
+                />
+              }
             />
             <ProtocolEventLines
               visibleFrom={params.from}
@@ -201,6 +221,9 @@ export function SupplyVsBurnChart() {
               stroke="#3b82f6"
               dot={false}
               strokeWidth={1.75}
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
             <Line
               yAxisId={rebased ? "supply" : "burn"}
@@ -210,6 +233,9 @@ export function SupplyVsBurnChart() {
               stroke="#ef4444"
               dot={false}
               strokeWidth={1.75}
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>

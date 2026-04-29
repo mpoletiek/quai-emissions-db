@@ -1,6 +1,7 @@
 "use client";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useCoinbaseLeaderboard } from "@/lib/hooks";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 // TopCoinbasesTable — top primary_coinbase addresses by blocks won in the
 // trailing window. Pools and solo miners are not distinguished — a coinbase
@@ -21,7 +22,7 @@ export function TopCoinbasesTable({
       <div className="flex items-end justify-between gap-3">
         <div>
           <CardTitle>Top coinbases · {days}d</CardTitle>
-          <p className="mt-1 text-xs text-slate-900/55 dark:text-white/55">
+          <p className="mt-1 text-xs text-slate-900/80 dark:text-white/80">
             Addresses with the most blocks sealed on cyprus1 in the trailing{" "}
             {days} days. May be pools or solo miners.
           </p>
@@ -35,7 +36,7 @@ export function TopCoinbasesTable({
 
       <div className="mt-3 overflow-x-auto">
         {isLoading ? (
-          <div className="h-32 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton height="h-32" />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
         ) : !data || data.rows.length === 0 ? (

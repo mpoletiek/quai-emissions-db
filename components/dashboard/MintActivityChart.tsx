@@ -5,12 +5,22 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const MINT_ACTIVITY_LEGEND: ChartLegendItem[] = [
+  { label: "QUAI mint", color: "#3b82f6" },
+  { label: "QI mint", color: "#10b981" },
+  { label: "both mint", color: "#a855f7" },
+  { label: "no delta", color: "#27272a" },
+  { label: "burn event", color: "#ef4444" },
+];
 
 /**
  * Replaces the "miner election via coinbase" concept — which was broken because
@@ -30,7 +40,7 @@ export function MintActivityChart({ limit = 500 }: { limit?: number }) {
     return (
       <Card>
         <CardTitle>Per-Block Mint Activity</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -80,6 +90,7 @@ export function MintActivityChart({ limit = 500 }: { limit?: number }) {
         <CardTitle>Per-Block Mint Activity</CardTitle>
         <div className="text-xs text-slate-900/50 dark:text-white/50">{bucketSize}-block buckets</div>
       </div>
+      <ChartLegend items={MINT_ACTIVITY_LEGEND} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -87,29 +98,31 @@ export function MintActivityChart({ limit = 500 }: { limit?: number }) {
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="start"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => "#" + String(v).slice(-5)}
+              tickLine={false}
+              axisLine={false}
               minTickGap={30}
             />
-            <YAxis tick={{ fill: "var(--chart-axis)", fontSize: 11 }} width={32} />
-            <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
+            <YAxis
+              tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              width={32}
             />
-            <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
-            <Bar dataKey="quaiOnly" stackId="m" fill="#3b82f6" name="QUAI mint" />
-            <Bar dataKey="qiOnly" stackId="m" fill="#10b981" name="QI mint" />
-            <Bar dataKey="both" stackId="m" fill="#a855f7" name="both mint" />
-            <Bar dataKey="inactive" stackId="m" fill="#27272a" name="no delta" />
-            <Bar dataKey="burn" stackId="b" fill="#ef4444" name="burn event" />
+            <Tooltip content={<ChartTooltip />} />
+            <Bar dataKey="quaiOnly" stackId="m" fill="#3b82f6" name="QUAI mint" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar dataKey="qiOnly" stackId="m" fill="#10b981" name="QI mint" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar dataKey="both" stackId="m" fill="#a855f7" name="both mint" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar dataKey="inactive" stackId="m" fill="#27272a" name="no delta" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar dataKey="burn" stackId="b" fill="#ef4444" name="burn event" isAnimationActive animationDuration={500} animationEasing="ease-out" />
           </BarChart>
         </ResponsiveContainer>
       </div>

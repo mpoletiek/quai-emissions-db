@@ -11,6 +11,7 @@ import {
   weiToFloat,
 } from "@/lib/format";
 import { PROTOCOL_EVENTS } from "./ProtocolEventLines";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 const CELL = 14;
 const GAP = 3;
@@ -176,7 +177,7 @@ export function WinnerTokenSplitChart() {
     return (
       <Card>
         <CardTitle>Blocks won by token · reward heatmap</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }

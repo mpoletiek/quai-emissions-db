@@ -1,7 +1,8 @@
 "use client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useBlocks } from "@/lib/hooks";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 // RecentBlocksFeed — table of the last N blocks. Auto-refreshes via the
 // existing useBlocks hook (60s). Column set is intentionally narrow: block
@@ -11,22 +12,43 @@ import { useBlocks } from "@/lib/hooks";
 export function RecentBlocksFeed({ limit = 20 }: { limit?: number }) {
   const { data, isLoading, error } = useBlocks(limit);
 
+  // Track the previous max block number across renders so we can mark
+  // freshly arrived rows. The "first run" guard ensures the initial mount
+  // doesn't flash every row — we capture the max on the first useEffect
+  // tick before any flash logic considers them fresh.
+  const prevMaxRef = useRef<number>(0);
+  const hasInitRef = useRef<boolean>(false);
+
   const rows = useMemo(() => {
     if (!data?.blocks) return [];
     // Newest first, capped at `limit`.
     return [...data.blocks].sort((a, b) => b.number - a.number).slice(0, limit);
   }, [data, limit]);
 
+  // Snapshot the previous max at render time (for this render's freshness
+  // decisions). On initial mount we treat everything as not-fresh.
+  const prevMaxAtRender = hasInitRef.current ? prevMaxRef.current : Infinity;
+
+  useEffect(() => {
+    if (!data?.blocks || data.blocks.length === 0) return;
+    const maxNow = data.blocks.reduce(
+      (acc, b) => (b.number > acc ? b.number : acc),
+      0,
+    );
+    prevMaxRef.current = maxNow;
+    hasInitRef.current = true;
+  }, [data?.blocks]);
+
   return (
     <Card>
       <CardTitle>Recent blocks</CardTitle>
-      <p className="mt-1 text-xs text-slate-900/55 dark:text-white/55">
+      <p className="mt-1 text-xs text-slate-900/80 dark:text-white/80">
         Last {limit} blocks on cyprus1. Refreshes every minute.
       </p>
 
       <div className="mt-3 overflow-x-auto">
         {isLoading ? (
-          <div className="h-32 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton height="h-32" />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
         ) : rows.length === 0 ? (
@@ -47,9 +69,11 @@ export function RecentBlocksFeed({ limit = 20 }: { limit?: number }) {
             <tbody>
               {rows.map((b) => {
                 const ageS = Math.max(0, Math.floor(Date.now() / 1000 - b.timestamp));
+                const isFresh = b.number > prevMaxAtRender;
                 return (
                   <tr
                     key={b.number}
+                    data-fresh={isFresh ? "true" : undefined}
                     className="border-t border-slate-900/5 dark:border-white/5"
                   >
                     <td className="py-1.5 font-mono">

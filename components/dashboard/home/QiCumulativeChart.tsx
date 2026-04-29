@@ -17,6 +17,8 @@ import {
   YAxis,
 } from "recharts";
 import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 // QiCumulativeChart — single-line cumulative Qi supply since Qi mining began.
 // Qi has no sinks (no burn, no Singularity skip), so the line is monotonically
@@ -50,7 +52,7 @@ export function QiCumulativeChart({
   return (
     <Card>
       <CardTitle>Qi cumulative supply</CardTitle>
-      <ul className="mt-1 max-w-md space-y-0.5 text-xs text-slate-900/55 dark:text-white/55">
+      <ul className="mt-1 max-w-md space-y-0.5 text-xs text-slate-900/80 dark:text-white/80">
         <li>
           <span className="font-medium text-emerald-600 dark:text-emerald-300">
             Green line
@@ -62,7 +64,7 @@ export function QiCumulativeChart({
 
       <div className="mt-3 h-56">
         {isLoading || !data ? (
-          <div className="h-full animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
         ) : data.length === 0 ? (
@@ -71,37 +73,49 @@ export function QiCumulativeChart({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <LineChart data={chartData} syncId="home" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatPeriodDate}
+                tickLine={false}
+                axisLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
+                tickLine={false}
+                axisLine={false}
                 width={64}
               />
               <Tooltip
-                contentStyle={{
-                  background: "var(--chart-tooltip-bg)",
-                  color: "var(--chart-tooltip-text)",
-                  border: "1px solid var(--chart-tooltip-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                labelFormatter={(v) => formatPeriodDate(String(v))}
-                formatter={(v) => [`${Number(v).toLocaleString()} QI`, "Qi supply"]}
+                content={
+                  <ChartTooltip
+                    labelFormatter={(v) => formatPeriodDate(String(v))}
+                    formatter={(v) => [
+                      `${Number(v).toLocaleString()} QI`,
+                      "Qi supply",
+                    ]}
+                  />
+                }
               />
               <ProtocolEventLines visibleFrom={from} visibleTo={to} />
               <Line
                 type="monotone"
                 dataKey="qi"
+                name="Qi supply"
                 stroke="#10b981"
                 strokeWidth={1.6}
                 dot={false}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             </LineChart>
           </ResponsiveContainer>

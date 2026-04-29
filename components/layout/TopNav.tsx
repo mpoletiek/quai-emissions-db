@@ -1,16 +1,15 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useHeadBlock } from "@/lib/hooks";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { DashboardSubNav } from "@/components/dashboard/shared/DashboardSubNav";
 
-const TABS = [
-  { href: "/dashboard", label: "Dashboard" },
-];
+// Single-bar layout: logo + dashboard surface tabs (rendered inline via
+// DashboardSubNav) + status cluster + theme toggle. Replaces the previous
+// stacked TopNav-over-DashboardSubNav layout. Target height ~52px.
 
 export function TopNav() {
-  const pathname = usePathname();
   return (
     <nav
       className="sticky top-0 z-10 border-b backdrop-blur"
@@ -19,34 +18,23 @@ export function TopNav() {
         borderColor: "var(--nav-border)",
       }}
     >
-      <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 md:px-8">
-        <div className="flex items-center gap-1 py-2">
+      <div className="mx-auto flex h-[52px] max-w-[1400px] items-center justify-between gap-4 px-4 md:px-8">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/"
-            className="mr-3 text-sm font-semibold tracking-tight text-slate-900 dark:text-white/90"
+            className="shrink-0 text-sm font-semibold tracking-tight text-slate-900 dark:text-white/90"
           >
             Quai Emissions
           </Link>
-          {TABS.map((t) => {
-            const active =
-              pathname === t.href || (pathname?.startsWith(t.href + "/") ?? false);
-            return (
-              <Link
-                key={t.href}
-                href={t.href}
-                className={cn(
-                  "rounded-md px-3 py-1 text-sm transition",
-                  active
-                    ? "bg-slate-900/10 text-slate-900 dark:bg-white/10 dark:text-white"
-                    : "text-slate-700 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90",
-                )}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
+          <span
+            aria-hidden
+            className="hidden h-5 w-px shrink-0 bg-slate-900/10 dark:bg-white/10 sm:inline-block"
+          />
+          <div className="min-w-0 overflow-x-auto">
+            <DashboardSubNav />
+          </div>
         </div>
-        <div className="flex items-center gap-3 py-2">
+        <div className="flex shrink-0 items-center gap-3">
           <StatusCluster />
           <ThemeToggle />
         </div>
@@ -84,3 +72,4 @@ function StatusCluster() {
     </div>
   );
 }
+

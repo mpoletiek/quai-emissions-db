@@ -1,15 +1,9 @@
 import type { ReactNode } from "react";
-import { DashboardSubNav } from "@/components/dashboard/shared/DashboardSubNav";
 
-// /dashboard layout — wraps the new dashboard surfaces (home, tokenomics,
-// mining, history, live) with a shared sub-nav. The legacy /history and
-// /live pages are unaffected and continue to render under the root layout.
+// /dashboard layout — kept for symmetry with possible per-surface metadata
+// or providers. The dashboard tab strip is rendered inline inside TopNav
+// (Phase 1 collapsed the two stacked bars into one).
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <DashboardSubNav />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

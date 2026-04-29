@@ -4,7 +4,6 @@ import { Card, CardTitle } from "@/components/ui/Card";
 import { useSupply } from "@/lib/hooks";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -15,6 +14,13 @@ import {
 } from "recharts";
 import { formatCompact, weiToFloat } from "@/lib/format";
 import { InfoPopover } from "@/components/ui/InfoPopover";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend } from "@/components/ui/ChartLegend";
+
+const EMISSIONS_COMPARISON_LEGEND = [
+  { label: "QUAI % of cap", color: "#3b82f6" },
+  { label: "BTC % of cap", color: "#f97316" },
+];
 import {
   BTC_CAP,
   bitcoinSupplyAt,
@@ -158,7 +164,7 @@ export function EmissionsComparisonChart() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>QUAI vs Bitcoin emission curves</CardTitle>
-          <div className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+          <div className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
             <p>
               Cumulative supply as % of each network's cap, aligned from
               each genesis (year 0 = launch).
@@ -215,13 +221,19 @@ export function EmissionsComparisonChart() {
         </InfoPopover>
       </div>
 
-      <div className="mt-4 h-72 sm:h-80">
+      <ChartLegend items={EMISSIONS_COMPARISON_LEGEND} className="mt-3" />
+
+      <div className="mt-3 h-72 sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
           >
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               type="number"
               dataKey="year"
@@ -229,48 +241,52 @@ export function EmissionsComparisonChart() {
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => `Y${Math.round(Number(v))}`}
               ticks={[0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40]}
+              tickLine={false}
+              axisLine={false}
               minTickGap={32}
             />
             <YAxis
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => `${v}%`}
               domain={[0, 105]}
+              tickLine={false}
+              axisLine={false}
               width={48}
             />
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => `Year ${Number(v).toFixed(2)} since genesis`}
-              formatter={(v, name, item) => {
-                const row = item.payload as {
-                  btc: number;
-                  quai: number;
-                  btcPct: number;
-                  quaiPct: number;
-                  btcDate: string;
-                  quaiDate: string;
-                };
-                if (name === "QUAI % of cap") {
-                  return [
-                    `${Number(v).toFixed(2)}% — ${formatCompact(row.quai)} QUAI (${row.quaiDate})`,
-                    name,
-                  ];
-                }
-                if (name === "BTC % of cap") {
-                  return [
-                    `${Number(v).toFixed(2)}% — ${formatCompact(row.btc)} BTC (${row.btcDate})`,
-                    name,
-                  ];
-                }
-                return [v, name];
-              }}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) =>
+                    `Year ${Number(v).toFixed(2)} since genesis`
+                  }
+                  formatter={(v, name, item) => {
+                    const row = item.payload as
+                      | {
+                          btc: number;
+                          quai: number;
+                          btcPct: number;
+                          quaiPct: number;
+                          btcDate: string;
+                          quaiDate: string;
+                        }
+                      | undefined;
+                    if (name === "QUAI % of cap" && row) {
+                      return [
+                        `${Number(v).toFixed(2)}% — ${formatCompact(row.quai)} QUAI (${row.quaiDate})`,
+                        name,
+                      ];
+                    }
+                    if (name === "BTC % of cap" && row) {
+                      return [
+                        `${Number(v).toFixed(2)}% — ${formatCompact(row.btc)} BTC (${row.btcDate})`,
+                        name,
+                      ];
+                    }
+                    return [v, name];
+                  }}
+                />
+              }
             />
-            <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
 
             {/* "Now" lines — one per network, at their respective year-since-genesis. */}
             <ReferenceLine
@@ -338,6 +354,9 @@ export function EmissionsComparisonChart() {
               stroke="#3b82f6"
               strokeWidth={1.6}
               dot={false}
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
             <Line
               type="monotone"
@@ -346,6 +365,9 @@ export function EmissionsComparisonChart() {
               stroke="#f97316"
               strokeWidth={1.6}
               dot={false}
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>

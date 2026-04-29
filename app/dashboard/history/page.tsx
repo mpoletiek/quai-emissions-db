@@ -1,6 +1,8 @@
 "use client";
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+// Note: spacing rhythm on this page is already `space-y-4`; intentionally
+// not touched per Phase 1 spec.
 import { Card, CardTitle } from "@/components/ui/Card";
 import { HistoryControls } from "@/components/dashboard/history/HistoryControls";
 import { ProtocolEventsLegend } from "@/components/dashboard/history/ProtocolEventsLegend";
@@ -23,18 +25,12 @@ const ROLLUPS_ENABLED = process.env.NEXT_PUBLIC_ROLLUPS_ENABLED === "true";
 // params are interchangeable).
 
 export default function DashboardHistoryPage() {
+  useEffect(() => {
+    document.title = "Quai · History";
+  }, []);
+
   return (
     <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-10">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">History</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-900/60 dark:text-white/60">
-          Slice rollups by period and range. Daily, weekly, and monthly
-          aggregates of QUAI and Qi credit flow on{" "}
-          <code className="text-slate-900/80 dark:text-white/80">cyprus1</code>,
-          bucketed in UTC.
-        </p>
-      </header>
-
       <Suspense fallback={<ControlsSkeleton />}>
         <DefaultLandingEffect />
         <div className="mb-4">
@@ -48,7 +44,7 @@ export default function DashboardHistoryPage() {
 
 function ChartGrid() {
   return (
-    <div className="space-y-4">
+    <div className="fade-in-stagger space-y-4">
       <HistoricalKpiStrip />
       <ProtocolEventsLegend />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

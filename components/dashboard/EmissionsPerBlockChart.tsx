@@ -10,8 +10,15 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  Legend,
 } from "recharts";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const EMISSIONS_PER_BLOCK_LEGEND: ChartLegendItem[] = [
+  { label: "Block reward", color: "#3b82f6" },
+  { label: "Workshare reward", color: "#10b981" },
+];
 
 export function EmissionsPerBlockChart({ limit = 500 }: { limit?: number }) {
   const { data, isLoading, error } = useEmissions(limit);
@@ -20,7 +27,7 @@ export function EmissionsPerBlockChart({ limit = 500 }: { limit?: number }) {
     return (
       <Card className="col-span-2">
         <CardTitle>Estimated Miner Reward per Block</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -58,6 +65,7 @@ export function EmissionsPerBlockChart({ limit = 500 }: { limit?: number }) {
           detail window {detailed.length.toLocaleString()} blocks · head #{data.latest.toLocaleString()}
         </div>
       </div>
+      <ChartLegend items={EMISSIONS_PER_BLOCK_LEGEND} className="mt-2" />
       <div
         className="mt-3 h-72"
         role="img"
@@ -65,31 +73,35 @@ export function EmissionsPerBlockChart({ limit = 500 }: { limit?: number }) {
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="block"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => "#" + String(v).slice(-4)}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             <YAxis
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={52}
             />
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              formatter={(v, name) => [Number(v).toFixed(4), String(name)]}
-              labelFormatter={(v) => `Block #${Number(v).toLocaleString()}`}
+              content={
+                <ChartTooltip
+                  formatter={(v, name) => [Number(v).toFixed(4), String(name)]}
+                  labelFormatter={(v) => `Block #${Number(v).toLocaleString()}`}
+                />
+              }
             />
-            <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
-            <Bar dataKey="blockReward" stackId="a" fill="#3b82f6" name="Block reward" />
-            <Bar dataKey="workshareReward" stackId="a" fill="#10b981" name="Workshare reward" />
+            <Bar dataKey="blockReward" stackId="a" fill="#3b82f6" name="Block reward" isAnimationActive animationDuration={500} animationEasing="ease-out" />
+            <Bar dataKey="workshareReward" stackId="a" fill="#10b981" name="Workshare reward" isAnimationActive animationDuration={500} animationEasing="ease-out" />
           </BarChart>
         </ResponsiveContainer>
       </div>

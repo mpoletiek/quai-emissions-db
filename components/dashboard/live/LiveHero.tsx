@@ -5,7 +5,9 @@ import { useHeadBlock, useReorgs, useStats } from "@/lib/hooks";
 
 // LiveHero — 4 KPIs for /dashboard/live.
 // Block height + sync state come from /api/health. Reorgs (24h) from
-// /api/reorgs. Workshares per block from /api/stats.
+// /api/reorgs. Workshares per block from /api/stats. No sparkline on the
+// dominant card — none of the live endpoints expose a windowed time-series
+// without introducing a new data source (out of Phase 2 scope).
 
 export function LiveHero() {
   const { data: head } = useHeadBlock();
@@ -18,12 +20,14 @@ export function LiveHero() {
       id: "head",
       label: "Latest block",
       value: blockNum != null ? `#${blockNum.toLocaleString()}` : "—",
+      numericValue: blockNum ?? undefined,
       sub: head
         ? head.lagBlocks === 0
           ? "Synced with chain head."
           : `${head.lagBlocks.toLocaleString()} blocks behind head.`
         : "Awaiting /api/health.",
       loading: !head,
+      accent: "blue",
     };
   }, [head]);
 
@@ -41,6 +45,7 @@ export function LiveHero() {
     id: "reorgs",
     label: "Reorgs · 24h",
     value: reorgs ? reorgs.last24h.toLocaleString() : "—",
+    numericValue: reorgs?.last24h ?? undefined,
     sub:
       reorgs && reorgs.last24h === 0
         ? "Chain stable in last 24 hours."

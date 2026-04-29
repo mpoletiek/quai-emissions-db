@@ -11,7 +11,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,6 +18,14 @@ import {
 } from "recharts";
 import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
 import { InfoPopover } from "@/components/ui/InfoPopover";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const SUPPLY_STORY_LEGEND = [
+  { label: "Realized circulating", color: "#3b82f6" },
+  { label: "SOAP burn (subtracted)", color: "#f97316", dasharray: "4 3" },
+];
 
 // SupplyStoryChart — the home-page flagship.
 // Two stacked areas:
@@ -57,12 +64,24 @@ export function SupplyStoryChart({
 
   const last = data?.[data.length - 1];
 
+  // Conditional y-axis floor: if realized stays above FLOOR across the whole
+  // visible window, crop the y-axis so the variation isn't squashed against
+  // the top. Falls back to a 0-baseline when any sample dips below FLOOR
+  // (e.g. the "all" timeframe which includes the launch ramp from zero) so
+  // the early curve still has room to render.
+  const Y_FLOOR = 400_000_000;
+  const yMin = useMemo(() => {
+    if (!chartData.length) return 0;
+    const minRealized = Math.min(...chartData.map((d) => d.realized));
+    return minRealized >= Y_FLOOR ? Y_FLOOR : 0;
+  }, [chartData]);
+
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>QUAI supply story</CardTitle>
-          <ul className="mt-1 max-w-xl space-y-0.5 text-xs text-slate-900/55 dark:text-white/55">
+          <ul className="mt-1 max-w-xl space-y-0.5 text-xs text-slate-900/80 dark:text-white/80">
             <li>
               <span className="font-medium text-blue-600 dark:text-blue-300">
                 Realized
@@ -113,9 +132,11 @@ export function SupplyStoryChart({
         </InfoPopover>
       </div>
 
-      <div className="mt-4 h-72 sm:h-80">
+      <ChartLegend items={SUPPLY_STORY_LEGEND} className="mt-3" />
+
+      <div className="mt-3 h-72 sm:h-80">
         {isLoading || !data ? (
-          <div className="h-full animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
         ) : data.length === 0 ? (
@@ -124,7 +145,7 @@ export function SupplyStoryChart({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData} syncId="home" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 {/* Diagonal-stripe pattern used as the SOAP-burn area fill.
                     Visually signals "this would be circulating supply but
@@ -150,33 +171,39 @@ export function SupplyStoryChart({
                   />
                 </pattern>
               </defs>
-              <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatPeriodDate}
+                tickLine={false}
+                axisLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
+                tickLine={false}
+                axisLine={false}
                 width={64}
+                domain={[yMin, "auto"]}
+                allowDataOverflow={yMin > 0}
               />
               <Tooltip
-                contentStyle={{
-                  background: "var(--chart-tooltip-bg)",
-                  color: "var(--chart-tooltip-text)",
-                  border: "1px solid var(--chart-tooltip-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                labelFormatter={(v) => formatPeriodDate(String(v))}
-                formatter={(v, name) => [
-                  `${Number(v).toLocaleString()} QUAI`,
-                  String(name),
-                ]}
+                content={
+                  <ChartTooltip
+                    labelFormatter={(v) => formatPeriodDate(String(v))}
+                    formatter={(v, name) => [
+                      `${Number(v).toLocaleString()} QUAI`,
+                      name,
+                    ]}
+                  />
+                }
               />
-              <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
               <ProtocolEventLines visibleFrom={from} visibleTo={to} />
               <Area
                 type="monotone"
@@ -186,6 +213,9 @@ export function SupplyStoryChart({
                 stroke="#3b82f6"
                 fill="#3b82f6"
                 fillOpacity={0.5}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
               <Area
                 type="monotone"
@@ -196,6 +226,9 @@ export function SupplyStoryChart({
                 strokeWidth={1.4}
                 strokeDasharray="4 3"
                 fill="url(#soap-burn-stripes)"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             </AreaChart>
           </ResponsiveContainer>

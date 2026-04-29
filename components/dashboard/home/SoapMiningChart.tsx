@@ -10,7 +10,6 @@ import {
 import { nz } from "@/lib/quai/types";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -21,6 +20,9 @@ import {
 import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
 import { InfoPopover } from "@/components/ui/InfoPopover";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 import {
   SOAP_ACTIVATION_DATE,
   applyLockupMultiplier,
@@ -175,13 +177,30 @@ export function SoapMiningChart({ to }: { to: string }) {
   const last = chartData[chartData.length - 1];
   const showSimSeries = mode !== "mined";
 
+  const legendItems: ChartLegendItem[] = showSimSeries
+    ? [
+        {
+          label: "Cumulative QUAI mined (actual)",
+          color: "#10b981",
+          dasharray: "4 3",
+        },
+        { label: "Cumulative issued (sim)", color: "#3b82f6" },
+        { label: "Cumulative unlocked (sim)", color: "#a855f7" },
+        { label: "Cumulative SOAP burn", color: "#f97316" },
+      ]
+    : [
+        { label: "Cumulative QUAI mined", color: "#3b82f6" },
+        { label: "Cumulative SOAP burn", color: "#f97316" },
+        { label: "Net (mined − burned)", color: "#10b981", dasharray: "3 3" },
+      ];
+
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>QUAI mining vs SOAP burn since SOAP</CardTitle>
           {showSimSeries ? (
-            <div className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+            <div className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
               <p>
                 <span className="font-medium">What-if:</span> every miner
                 locks rewards for{" "}
@@ -208,10 +227,10 @@ export function SoapMiningChart({ to }: { to: string }) {
                   {" "}— same as Mined mode.
                 </li>
                 <li>
-                  <span className="font-medium text-slate-700 dark:text-white/70">
+                  <span className="font-medium text-emerald-600 dark:text-emerald-300">
                     Actual mined
                   </span>
-                  {" "}(grey dashed) — no-multiplier baseline for comparison.
+                  {" "}(green dashed) — no-multiplier baseline for comparison.
                 </li>
               </ul>
               <p className="mt-1">
@@ -220,7 +239,7 @@ export function SoapMiningChart({ to }: { to: string }) {
               </p>
             </div>
           ) : (
-            <div className="mt-1 max-w-xl text-xs text-slate-900/55 dark:text-white/55">
+            <div className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
               <p>
                 Both lines zero-anchored at SOAP activation
                 ({SOAP_ACTIVATION_DATE}).
@@ -326,9 +345,11 @@ export function SoapMiningChart({ to }: { to: string }) {
         </div>
       </div>
 
-      <div className="mt-4 h-72 sm:h-80">
+      <ChartLegend items={legendItems} className="mt-3" />
+
+      <div className="mt-3 h-72 sm:h-80">
         {isLoading || !data ? (
-          <div className="h-full animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">
             {String(error)}
@@ -341,46 +362,53 @@ export function SoapMiningChart({ to }: { to: string }) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}
+              syncId="home"
               margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             >
-              <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatPeriodDate}
+                tickLine={false}
+                axisLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={formatCompact}
+                tickLine={false}
+                axisLine={false}
                 width={64}
               />
               <Tooltip
-                contentStyle={{
-                  background: "var(--chart-tooltip-bg)",
-                  color: "var(--chart-tooltip-text)",
-                  border: "1px solid var(--chart-tooltip-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                labelFormatter={(v) => formatPeriodDate(String(v))}
-                formatter={(v, name) => [
-                  `${Number(v).toLocaleString()} QUAI`,
-                  String(name),
-                ]}
+                content={
+                  <ChartTooltip
+                    labelFormatter={(v) => formatPeriodDate(String(v))}
+                    formatter={(v, name) => [
+                      `${Number(v).toLocaleString()} QUAI`,
+                      name,
+                    ]}
+                  />
+                }
               />
-              <Legend wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }} />
               <ProtocolEventLines visibleFrom={from} visibleTo={to} />
               {showSimSeries && (
                 <Line
                   type="monotone"
                   dataKey="actual"
                   name="Cumulative QUAI mined (actual)"
-                  stroke="var(--chart-axis)"
-                  strokeOpacity={0.55}
-                  strokeWidth={1.2}
-                  strokeDasharray="3 3"
+                  stroke="#10b981"
+                  strokeWidth={1.4}
+                  strokeDasharray="4 3"
                   dot={false}
+                  isAnimationActive
+                  animationDuration={500}
+                  animationEasing="ease-out"
                 />
               )}
               <Line
@@ -394,6 +422,9 @@ export function SoapMiningChart({ to }: { to: string }) {
                 stroke="#3b82f6"
                 strokeWidth={1.6}
                 dot={false}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
               {showSimSeries && (
                 <Line
@@ -403,6 +434,9 @@ export function SoapMiningChart({ to }: { to: string }) {
                   stroke="#a855f7"
                   strokeWidth={1.6}
                   dot={false}
+                  isAnimationActive
+                  animationDuration={500}
+                  animationEasing="ease-out"
                 />
               )}
               <Line
@@ -412,6 +446,9 @@ export function SoapMiningChart({ to }: { to: string }) {
                 stroke="#f97316"
                 strokeWidth={1.6}
                 dot={false}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
               {!showSimSeries && (
                 <Line
@@ -422,6 +459,9 @@ export function SoapMiningChart({ to }: { to: string }) {
                   strokeWidth={1.2}
                   strokeDasharray="3 3"
                   dot={false}
+                  isAnimationActive
+                  animationDuration={500}
+                  animationEasing="ease-out"
                 />
               )}
             </LineChart>

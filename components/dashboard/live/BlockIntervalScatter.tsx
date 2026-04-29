@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useBlocks, useReorgs } from "@/lib/hooks";
 import {
+  Brush,
   CartesianGrid,
   ReferenceDot,
   ResponsiveContainer,
@@ -14,6 +15,8 @@ import {
   ZAxis,
 } from "recharts";
 import { InfoPopover } from "@/components/ui/InfoPopover";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 // BlockIntervalScatter — flagship for /dashboard/live.
 // X axis is block number, Y axis is interval-since-prev (seconds). Reorg
@@ -54,7 +57,7 @@ export function BlockIntervalScatter({ window = 1000 }: { window?: number }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardTitle>Block intervals · last {window.toLocaleString()}</CardTitle>
-          <p className="mt-1 max-w-md text-xs text-slate-900/55 dark:text-white/55">
+          <p className="mt-1 max-w-md text-xs text-slate-900/80 dark:text-white/80">
             Seconds between consecutive blocks on cyprus1. Red dots mark
             reorg events at the diverging block.
           </p>
@@ -77,9 +80,9 @@ export function BlockIntervalScatter({ window = 1000 }: { window?: number }) {
         </InfoPopover>
       </div>
 
-      <div className="mt-4 h-64 sm:h-72">
+      <div className="mt-4 h-72 sm:h-80">
         {isLoading || !blocks ? (
-          <div className="h-full animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+          <ChartSkeleton />
         ) : error ? (
           <div className="text-sm text-red-600 dark:text-red-300">{String(error)}</div>
         ) : points.length === 0 ? (
@@ -88,14 +91,20 @@ export function BlockIntervalScatter({ window = 1000 }: { window?: number }) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+            <ScatterChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid
+                stroke="var(--chart-grid-soft)"
+                strokeDasharray="2 4"
+                vertical={false}
+              />
               <XAxis
                 type="number"
                 dataKey="number"
                 domain={[range.min, range.max]}
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={(v) => `#${Number(v).toLocaleString()}`}
+                tickLine={false}
+                axisLine={false}
                 width={80}
               />
               <YAxis
@@ -103,24 +112,23 @@ export function BlockIntervalScatter({ window = 1000 }: { window?: number }) {
                 dataKey="interval"
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
                 tickFormatter={(v) => `${v}s`}
+                tickLine={false}
+                axisLine={false}
                 width={48}
               />
               <ZAxis range={[12, 12]} />
               <Tooltip
-                contentStyle={{
-                  background: "var(--chart-tooltip-bg)",
-                  color: "var(--chart-tooltip-text)",
-                  border: "1px solid var(--chart-tooltip-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
                 cursor={{ strokeDasharray: "3 3" }}
-                formatter={(v, name) => {
-                  if (name === "interval") return [`${v}s`, "interval"];
-                  if (name === "number")
-                    return [`#${Number(v).toLocaleString()}`, "block"];
-                  return [v, name];
-                }}
+                content={
+                  <ChartTooltip
+                    formatter={(v, name) => {
+                      if (name === "interval") return [`${v}s`, "interval"];
+                      if (name === "number")
+                        return [`#${Number(v).toLocaleString()}`, "block"];
+                      return [v, name];
+                    }}
+                  />
+                }
               />
               <Scatter
                 name="block"
@@ -140,6 +148,14 @@ export function BlockIntervalScatter({ window = 1000 }: { window?: number }) {
                   ifOverflow="extendDomain"
                 />
               ))}
+              <Brush
+                dataKey="number"
+                height={24}
+                stroke="var(--chart-axis-muted)"
+                travellerWidth={8}
+                fill="var(--card-bg)"
+                tickFormatter={(v) => "#" + Number(v).toLocaleString()}
+              />
             </ScatterChart>
           </ResponsiveContainer>
         )}

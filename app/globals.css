@@ -12,7 +12,7 @@
   --foreground: #0f172a;
 
   --card-bg: #ffffff;
-  --card-border: rgba(15, 23, 42, 0.08);
+  --card-border: rgba(15, 23, 42, 0.06);
 
   --nav-bg: rgba(250, 250, 252, 0.85);
   --nav-border: rgba(15, 23, 42, 0.08);
@@ -24,6 +24,7 @@
   /* Chart styling — passed through to Recharts props as `var(--...)` strings
      so the SVG inherits the current theme at render time. */
   --chart-grid: rgba(15, 23, 42, 0.08);
+  --chart-grid-soft: rgba(15, 23, 42, 0.04);
   --chart-axis: rgba(15, 23, 42, 0.55);
   --chart-axis-muted: rgba(15, 23, 42, 0.4);
   --chart-tooltip-bg: #ffffff;
@@ -39,7 +40,7 @@
   --foreground: #e5e7eb;
 
   --card-bg: rgba(255, 255, 255, 0.03);
-  --card-border: rgba(255, 255, 255, 0.1);
+  --card-border: rgba(255, 255, 255, 0.08);
 
   --nav-bg: rgba(10, 11, 16, 0.8);
   --nav-border: rgba(255, 255, 255, 0.1);
@@ -49,6 +50,7 @@
   --popover-text: #e5e7eb;
 
   --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-grid-soft: rgba(255, 255, 255, 0.03);
   --chart-axis: rgba(255, 255, 255, 0.5);
   --chart-axis-muted: rgba(255, 255, 255, 0.4);
   --chart-tooltip-bg: #0f1117;
@@ -77,16 +79,128 @@ body {
 }
 
 .card {
-  @apply rounded-xl p-4 shadow-sm backdrop-blur;
+  @apply rounded-xl p-4;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
+  box-shadow:
+    0 1px 0 rgba(15, 23, 42, 0.04),
+    0 8px 24px -12px rgba(15, 23, 42, 0.08);
+}
+
+.dark .card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%),
+    var(--card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .card-title {
-  @apply text-xs font-medium uppercase tracking-wider;
-  color: rgba(15, 23, 42, 0.6);
+  @apply text-base font-semibold tracking-tight;
+  color: rgba(15, 23, 42, 0.95);
 }
 
 .dark .card-title {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Tabular numerals — applied to KPI / value cells in Phase 2 to keep
+   monospaced columns aligned without forcing a monospace font. */
+.tabular {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chart loading shimmer. Skeleton component sweeps a soft highlight across
+   a gradient track to telegraph "data is loading" without a noisy spinner. */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.04) 0%,
+    rgba(15, 23, 42, 0.08) 50%,
+    rgba(15, 23, 42, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Staggered fade-in on mount — Phase 2. Each direct child fades + slides up
+   8px on first mount with a 30ms stagger. Uses CSS `@starting-style` so
+   the entry only fires on initial mount (per spec) — re-renders don't
+   re-trigger. Older browsers without @starting-style support degrade
+   gracefully: children appear instantly, no broken layout.
+   Respects prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in-stagger > * {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 400ms ease-out,
+      transform 400ms ease-out;
+  }
+  @starting-style {
+    .fade-in-stagger > * {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  .fade-in-stagger > *:nth-child(1) {
+    transition-delay: 0ms;
+  }
+  .fade-in-stagger > *:nth-child(2) {
+    transition-delay: 30ms;
+  }
+  .fade-in-stagger > *:nth-child(3) {
+    transition-delay: 60ms;
+  }
+  .fade-in-stagger > *:nth-child(4) {
+    transition-delay: 90ms;
+  }
+  .fade-in-stagger > *:nth-child(5) {
+    transition-delay: 120ms;
+  }
+  .fade-in-stagger > *:nth-child(6) {
+    transition-delay: 150ms;
+  }
+}
+
+/* RecentBlocksFeed flash-on-arrival — Phase 3. New rows (block number
+   greater than the previous max captured at render time) get
+   data-fresh="true" and pulse emerald briefly. One-shot keyframe so the
+   row settles back to default background. Reduced-motion users skip it. */
+@keyframes row-flash {
+  0% {
+    background: rgba(16, 185, 129, 0.18);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-fresh="true"] {
+    animation: row-flash 1.2s ease-out;
+  }
 }

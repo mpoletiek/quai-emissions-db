@@ -11,6 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
 
 export function ExchangeRateChart({ limit = 500 }: { limit?: number }) {
   const { data, isLoading } = useEmissions(limit);
@@ -19,7 +21,7 @@ export function ExchangeRateChart({ limit = 500 }: { limit?: number }) {
     return (
       <Card>
         <CardTitle>Exchange Rate</CardTitle>
-        <div className="mt-4 h-56 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-56" className="mt-4" />
       </Card>
     );
   }
@@ -50,27 +52,32 @@ export function ExchangeRateChart({ limit = 500 }: { limit?: number }) {
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="block"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={(v) => "#" + String(v).slice(-4)}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             <YAxis
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={64}
               domain={["auto", "auto"]}
             />
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => `Block #${Number(v).toLocaleString()}`}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => `Block #${Number(v).toLocaleString()}`}
+                />
+              }
             />
             <Line
               type="monotone"
@@ -79,6 +86,9 @@ export function ExchangeRateChart({ limit = 500 }: { limit?: number }) {
               dot={false}
               strokeWidth={1.5}
               name="exchangeRate"
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>

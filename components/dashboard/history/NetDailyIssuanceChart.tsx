@@ -15,7 +15,6 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -23,6 +22,9 @@ import {
   YAxis,
 } from "recharts";
 import { ProtocolEventLines } from "./ProtocolEventLines";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 type TokenFilter = "both" | "quai" | "qi";
 
@@ -47,7 +49,7 @@ export function NetDailyIssuanceChart() {
     return (
       <Card>
         <CardTitle>Net issuance per {params.period}</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -84,6 +86,16 @@ export function NetDailyIssuanceChart() {
       qiNeg: qi < 0 ? qi : null,
     };
   });
+
+  const legend: ChartLegendItem[] = [];
+  if (showQuai) {
+    legend.push({ label: "QUAI net (positive)", color: "#3b82f6" });
+    legend.push({ label: "QUAI net (negative)", color: "#ef4444" });
+  }
+  if (showQi) {
+    legend.push({ label: "QI net (positive)", color: "#10b981" });
+    legend.push({ label: "QI net (negative)", color: "#f97316" });
+  }
 
   return (
     <Card>
@@ -137,6 +149,7 @@ export function NetDailyIssuanceChart() {
           </InfoPopover>
         </div>
       </div>
+      <ChartLegend items={legend} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -153,17 +166,25 @@ export function NetDailyIssuanceChart() {
             data={data}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
           >
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={formatPeriodDate}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             {showQuai && (
               <YAxis
                 yAxisId="quai"
                 tick={{ fill: "rgba(59,130,246,0.8)", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
                 width={60}
                 tickFormatter={formatCompact}
               />
@@ -173,23 +194,19 @@ export function NetDailyIssuanceChart() {
                 yAxisId="qi"
                 orientation={showQuai ? "right" : "left"}
                 tick={{ fill: "rgba(16,185,129,0.9)", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
                 width={60}
                 tickFormatter={formatCompact}
               />
             )}
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => formatPeriodDate(String(v))}
-              formatter={(v, name) => [Number(v).toLocaleString(), String(name)]}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => formatPeriodDate(String(v))}
+                  formatter={(v, name) => [Number(v).toLocaleString(), String(name)]}
+                />
+              }
             />
             <ReferenceLine
               yAxisId={showQuai ? "quai" : "qi"}
@@ -210,6 +227,9 @@ export function NetDailyIssuanceChart() {
                 name="QUAI net (positive)"
                 fill="#3b82f6"
                 stackId="quai"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             )}
             {showQuai && (
@@ -219,6 +239,9 @@ export function NetDailyIssuanceChart() {
                 name="QUAI net (negative)"
                 fill="#ef4444"
                 stackId="quai"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             )}
             {showQi && (
@@ -228,6 +251,9 @@ export function NetDailyIssuanceChart() {
                 name="QI net (positive)"
                 fill="#10b981"
                 stackId="qi"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             )}
             {showQi && (
@@ -237,6 +263,9 @@ export function NetDailyIssuanceChart() {
                 name="QI net (negative)"
                 fill="#f97316"
                 stackId="qi"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             )}
           </ComposedChart>

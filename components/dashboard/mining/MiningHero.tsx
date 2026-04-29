@@ -6,13 +6,15 @@ import {
   formatHashrate,
   formatBigTokens,
   formatSeconds,
+  weiToFloat,
 } from "@/lib/format";
 import { nz, nzn } from "@/lib/quai/types";
 
 // MiningHero — 4 KPIs for /dashboard/mining.
 // Live hashrate + reward + block time come from /api/stats (current 15-min
 // trailing averages). SHA workshare share comes from the most recent
-// post-SOAP rollup row in the displayed window.
+// post-SOAP rollup row in the displayed window. The dominant sparkline shows
+// the per-day total hashrate trend across the displayed window.
 
 export function MiningHero({ from, to }: { from: string; to: string }) {
   const { data: stats } = useStats();
@@ -23,6 +25,25 @@ export function MiningHero({ from, to }: { from: string; to: string }) {
     const p = stats.info.perAlgo;
     return p.kawpow.hashRate + p.sha.hashRate + p.scrypt.hashRate;
   }, [stats]);
+
+  const hashrateSpark = useMemo(() => {
+    if (!rollups || rollups.length === 0) return [] as number[];
+    // Sum per-day per-algo hashrate averages (NULL → 0). Drop leading rows
+    // that are all zero so the sparkline doesn't get squashed by pre-SOAP
+    // empty space.
+    const series: number[] = [];
+    let started = false;
+    for (const r of rollups) {
+      const total =
+        Number(nz(r.kawpowHashrateAvg)) +
+        Number(nz(r.shaHashrateAvg)) +
+        Number(nz(r.scryptHashrateAvg));
+      if (!started && total === 0) continue;
+      started = true;
+      series.push(total);
+    }
+    return series;
+  }, [rollups]);
 
   const shaShare = useMemo(() => {
     if (!rollups || rollups.length === 0) return null;
@@ -46,16 +67,23 @@ export function MiningHero({ from, to }: { from: string; to: string }) {
     id: "hashrate",
     label: "Combined network hashrate",
     value: totalHashrate != null ? formatHashrate(totalHashrate) : "—",
+    numericValue:
+      totalHashrate != null ? Number(totalHashrate) : undefined,
     sub: stats?.info?.perAlgo
       ? `KawPoW ${formatHashrate(stats.info.perAlgo.kawpow.hashRate)} · SHA ${formatHashrate(stats.info.perAlgo.sha.hashRate)} · Scrypt ${formatHashrate(stats.info.perAlgo.scrypt.hashRate)}`
       : "Trailing 15-minute average across all SOAP algorithms.",
     loading,
+    accent: "blue",
+    sparkline: hashrateSpark.length >= 2 ? { data: hashrateSpark } : undefined,
   };
 
   const reward: HeroCard = {
     id: "reward",
     label: "Base block reward",
     value: stats?.info ? formatBigTokens(stats.info.baseBlockReward, "QUAI") : "—",
+    numericValue: stats?.info
+      ? weiToFloat(stats.info.baseBlockReward, 4)
+      : undefined,
     sub: "Per-block subsidy before workshare distribution.",
     loading,
   };
@@ -66,6 +94,7 @@ export function MiningHero({ from, to }: { from: string; to: string }) {
     value: stats?.info?.avgBlockTime
       ? formatSeconds(stats.info.avgBlockTime)
       : "—",
+    numericValue: stats?.info?.avgBlockTime ?? undefined,
     sub: `${nzn(stats?.info?.blocksAnalyzed) || 0} blocks analyzed.`,
     loading,
   };
@@ -77,6 +106,7 @@ export function MiningHero({ from, to }: { from: string; to: string }) {
       shaShare == null
         ? "—"
         : `${shaShare.toFixed(1)}%`,
+    numericValue: shaShare ?? undefined,
     sub: "Of recent workshares; merge-mined BCH contribution.",
     loading,
   };

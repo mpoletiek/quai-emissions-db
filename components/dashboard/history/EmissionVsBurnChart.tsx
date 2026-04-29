@@ -12,7 +12,6 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -20,6 +19,14 @@ import {
   YAxis,
 } from "recharts";
 import { ProtocolEventLines } from "./ProtocolEventLines";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const EMISSION_VS_BURN_LEGEND: ChartLegendItem[] = [
+  { label: "QUAI issued", color: "#3b82f6" },
+  { label: "SOAP burn", color: "#ef4444" },
+];
 
 export function EmissionVsBurnChart() {
   const { params } = useHistoryParams();
@@ -33,7 +40,7 @@ export function EmissionVsBurnChart() {
     return (
       <Card>
         <CardTitle>QUAI issued vs SOAP burn per {params.period}</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -113,6 +120,7 @@ export function EmissionVsBurnChart() {
           </InfoPopover>
         </div>
       </div>
+      <ChartLegend items={EMISSION_VS_BURN_LEGEND} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -123,34 +131,36 @@ export function EmissionVsBurnChart() {
             data={data}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
           >
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={formatPeriodDate}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             <YAxis
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={64}
               tickFormatter={formatCompact}
             />
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => formatPeriodDate(String(v))}
-              formatter={(v, name) => [
-                `${Number(v).toLocaleString()} QUAI`,
-                String(name),
-              ]}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => formatPeriodDate(String(v))}
+                  formatter={(v, name) => [
+                    `${Number(v).toLocaleString()} QUAI`,
+                    String(name),
+                  ]}
+                />
+              }
             />
             <ReferenceLine y={0} stroke="var(--chart-reference-line)" />
             <ProtocolEventLines
@@ -159,8 +169,22 @@ export function EmissionVsBurnChart() {
             />
             {/* No stackId → Recharts groups the bars side-by-side per period.
                 Same Y axis so heights are directly comparable. */}
-            <Bar dataKey="emission" name="QUAI issued" fill="#3b82f6" />
-            <Bar dataKey="burn" name="SOAP burn" fill="#ef4444" />
+            <Bar
+              dataKey="emission"
+              name="QUAI issued"
+              fill="#3b82f6"
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
+            />
+            <Bar
+              dataKey="burn"
+              name="SOAP burn"
+              fill="#ef4444"
+              isAnimationActive
+              animationDuration={500}
+              animationEasing="ease-out"
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

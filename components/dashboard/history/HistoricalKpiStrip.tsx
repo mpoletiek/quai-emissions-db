@@ -1,18 +1,20 @@
 "use client";
-import { Card, CardTitle } from "@/components/ui/Card";
+import { useMemo } from "react";
+import { HeroStrip, type HeroCard } from "@/components/dashboard/shared/HeroStrip";
 import { useRollups, computeRollupSummary } from "@/lib/hooks";
 import { useHistoryParams } from "@/lib/useHistoryParams";
-import { formatBigQi, formatBigTokens } from "@/lib/format";
+import {
+  formatBigQi,
+  formatBigTokens,
+  formatCompact,
+  qitsToFloat,
+  weiToFloat,
+} from "@/lib/format";
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <Card>
-      <CardTitle>{title}</CardTitle>
-      <div className="mt-2 h-6 w-24 animate-pulse rounded bg-slate-900/10 dark:bg-white/10" />
-      <div className="mt-1 h-4 w-32 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
-    </Card>
-  );
-}
+// HistoricalKpiStrip — bento KPI lead-in for /dashboard/history. Dominant
+// card: QUAI issued in the selected range, with a per-period sparkline of
+// quai_added_sum. Supporting cards: Qi issued, SOAP burn, net QUAI issuance,
+// and (for daily period) peak daily QUAI.
 
 export function HistoricalKpiStrip() {
   const { params } = useHistoryParams();
@@ -24,69 +26,86 @@ export function HistoricalKpiStrip() {
 
   const summary = computeRollupSummary(rows, params.period);
 
-  if (isLoading || !summary) {
-    const titles =
-      params.period === "day"
-        ? ["QUAI issued", "QI issued", "SOAP burn", "Net QUAI", "Peak daily QUAI"]
-        : ["QUAI issued", "QI issued", "SOAP burn", "Net QUAI"];
-    return (
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {titles.map((t) => <Placeholder key={t} title={t} />)}
-      </div>
-    );
-  }
+  const sparkData = useMemo(() => {
+    if (!rows || rows.length === 0) return [] as number[];
+    return rows.map((r) => weiToFloat(r.quaiAddedSum, 0));
+  }, [rows]);
 
   const rangeLabel = `${params.period} · ${params.preset === "custom" ? `${params.from} → ${params.to}` : params.preset}`;
 
-  return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-      <Card>
-        <CardTitle>QUAI issued in range</CardTitle>
-        <div className="mt-2 text-xl font-semibold text-quai-700 dark:text-quai-100">
-          {formatBigTokens(summary.quaiIssued, "QUAI")}
-        </div>
-        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">Σ quai_added_sum · {rangeLabel}</div>
-      </Card>
+  const loading = isLoading || !summary;
 
-      <Card>
-        <CardTitle>QI issued in range</CardTitle>
-        <div className="mt-2 text-xl font-semibold text-qi-700 dark:text-qi-100">
-          {formatBigQi(summary.qiIssued)}
-        </div>
-        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">Σ qi_added_sum</div>
-      </Card>
+  const dominant: HeroCard = {
+    id: "quai-issued",
+    label: "QUAI issued in range",
+    value: summary ? (
+      <>
+        {formatCompact(weiToFloat(summary.quaiIssued, 0))}
+        <span className="ml-1 text-base font-normal text-slate-900/55 dark:text-white/55">
+          QUAI
+        </span>
+      </>
+    ) : (
+      "—"
+    ),
+    numericValue: summary ? weiToFloat(summary.quaiIssued, 0) : undefined,
+    sub: `Σ quai_added_sum · ${rangeLabel}`,
+    loading,
+    accent: "blue",
+    sparkline: sparkData.length >= 2 ? { data: sparkData } : undefined,
+  };
 
-      <Card>
-        <CardTitle>SOAP burn in range</CardTitle>
-        <div className="mt-2 text-xl font-semibold text-red-600 dark:text-red-300">
-          {formatBigTokens(summary.burnInRange, "QUAI")}
-        </div>
-        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">
-          burn_close[last] − burn_close[first]
-        </div>
-      </Card>
+  const qi: HeroCard = {
+    id: "qi-issued",
+    label: "QI issued in range",
+    value: summary ? formatBigQi(summary.qiIssued) : "—",
+    numericValue: summary ? qitsToFloat(summary.qiIssued, 0) : undefined,
+    sub: "Σ qi_added_sum",
+    loading,
+    accent: "emerald",
+  };
 
-      <Card>
-        <CardTitle>Net QUAI issuance</CardTitle>
-        <div className="mt-2 text-xl font-semibold text-quai-700 dark:text-quai-100">
-          {formatBigTokens(summary.netQuaiIssuance, "QUAI")}
-        </div>
-        <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">
-          net_emitted − burn_in_range
-        </div>
-      </Card>
+  const burn: HeroCard = {
+    id: "burn",
+    label: "SOAP burn in range",
+    value: summary ? formatBigTokens(summary.burnInRange, "QUAI") : "—",
+    numericValue: summary ? weiToFloat(summary.burnInRange, 0) : undefined,
+    sub: "burn_close[last] − burn_close[first]",
+    loading,
+    accent: "orange",
+  };
 
-      {summary.peakDailyQuaiIssued !== null && (
-        <Card>
-          <CardTitle>Peak daily QUAI issued</CardTitle>
-          <div className="mt-2 text-xl font-semibold text-quai-700 dark:text-quai-100">
-            {formatBigTokens(summary.peakDailyQuaiIssued, "QUAI")}
-          </div>
-          <div className="mt-1 text-xs text-slate-900/50 dark:text-white/50">
-            max(quai_added_sum) across range
-          </div>
-        </Card>
-      )}
-    </div>
-  );
+  const net: HeroCard = {
+    id: "net",
+    label: "Net QUAI issuance",
+    value: summary ? formatBigTokens(summary.netQuaiIssuance, "QUAI") : "—",
+    numericValue: summary
+      ? weiToFloat(summary.netQuaiIssuance, 0)
+      : undefined,
+    sub: "net_emitted − burn_in_range",
+    loading,
+    accent: "emerald",
+  };
+
+  const cards: HeroCard[] = [qi, burn, net];
+
+  if (params.period === "day") {
+    cards.push({
+      id: "peak",
+      label: "Peak daily QUAI issued",
+      value:
+        summary?.peakDailyQuaiIssued != null
+          ? formatBigTokens(summary.peakDailyQuaiIssued, "QUAI")
+          : "—",
+      numericValue:
+        summary?.peakDailyQuaiIssued != null
+          ? weiToFloat(summary.peakDailyQuaiIssued, 0)
+          : undefined,
+      sub: "max(quai_added_sum) across range",
+      loading,
+      accent: "amber",
+    });
+  }
+
+  return <HeroStrip dominant={dominant} cards={cards} />;
 }

@@ -15,13 +15,15 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { ProtocolEventLines } from "./ProtocolEventLines";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/ChartLegend";
+import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 type TokenFilter = "both" | "quai" | "qi";
 
@@ -46,7 +48,7 @@ export function DailyIssuanceChart() {
     return (
       <Card>
         <CardTitle>Issued per {params.period}</CardTitle>
-        <div className="mt-4 h-64 animate-pulse rounded bg-slate-900/5 dark:bg-white/5" />
+        <ChartSkeleton height="h-64" className="mt-4" />
       </Card>
     );
   }
@@ -74,6 +76,10 @@ export function DailyIssuanceChart() {
     quai: weiToFloat(r.quaiAddedSum, 2),
     qi: qitsToFloat(r.qiAddedSum, 3),
   }));
+
+  const legend: ChartLegendItem[] = [];
+  if (showQuai) legend.push({ label: "QUAI issued", color: "#3b82f6" });
+  if (showQi) legend.push({ label: "QI issued", color: "#10b981" });
 
   return (
     <Card>
@@ -127,6 +133,7 @@ export function DailyIssuanceChart() {
           </InfoPopover>
         </div>
       </div>
+      <ChartLegend items={legend} className="mt-2" />
       <div
         className="mt-3 h-64"
         role="img"
@@ -143,17 +150,25 @@ export function DailyIssuanceChart() {
             data={data}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
           >
-            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid
+              stroke="var(--chart-grid-soft)"
+              strokeDasharray="2 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: "var(--chart-axis)", fontSize: 11 }}
               tickFormatter={formatPeriodDate}
+              tickLine={false}
+              axisLine={false}
               minTickGap={40}
             />
             {showQuai && (
               <YAxis
                 yAxisId="quai"
                 tick={{ fill: "rgba(59,130,246,0.8)", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
                 width={60}
                 tickFormatter={formatCompact}
               />
@@ -163,23 +178,19 @@ export function DailyIssuanceChart() {
                 yAxisId="qi"
                 orientation={showQuai ? "right" : "left"}
                 tick={{ fill: "rgba(16,185,129,0.9)", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
                 width={60}
                 tickFormatter={formatCompact}
               />
             )}
             <Tooltip
-              contentStyle={{
-                background: "var(--chart-tooltip-bg)",
-                color: "var(--chart-tooltip-text)",
-                border: "1px solid var(--chart-tooltip-border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelFormatter={(v) => formatPeriodDate(String(v))}
-              formatter={(v, name) => [Number(v).toLocaleString(), String(name)]}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 11, color: "var(--chart-axis)" }}
+              content={
+                <ChartTooltip
+                  labelFormatter={(v) => formatPeriodDate(String(v))}
+                  formatter={(v, name) => [Number(v).toLocaleString(), String(name)]}
+                />
+              }
             />
             <ProtocolEventLines
               visibleFrom={params.from}
@@ -192,6 +203,9 @@ export function DailyIssuanceChart() {
                 dataKey="quai"
                 name="QUAI issued"
                 fill="#3b82f6"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             )}
             {showQi && (
@@ -200,6 +214,9 @@ export function DailyIssuanceChart() {
                 dataKey="qi"
                 name="QI issued"
                 fill="#10b981"
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
               />
             )}
           </ComposedChart>
