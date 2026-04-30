@@ -24,20 +24,21 @@ import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 
 const SUPPLY_STORY_LEGEND = [
   { label: "Realized circulating", color: "#3b82f6" },
-  { label: "SOAP burn (subtracted)", color: "#f97316", dasharray: "4 3" },
+  { label: "SOAP burn (overlay)", color: "#f97316", dasharray: "4 3" },
 ];
 
 // SupplyStoryChart — the home-page flagship.
-// Two stacked areas:
 //   • realized (blue)   — quai_total_end, what's actually circulating
 //                          (already net of SOAP burn at the RPC layer)
-//   • SOAP burn (orange) — balanceOf(0x0050AF…); the wedge represents QUAI
-//                          that was minted then redirected away
+//   • SOAP burn (orange) — balanceOf(0x0050AF…). Rendered as a separate
+//                          stack so it overlays the bottom of realized
+//                          rather than lifting it; visually subtractive,
+//                          matching SupplyDecompositionChart's treatment.
 //
-// Top of the stack = gross minted (realized + burn). The visual story is
-// "what was minted, and how much SOAP has redirected." Singularity Fork is
-// an annotation only — it eliminated FUTURE unlocks that were never minted
-// into the curve, so there's nothing to draw as a wedge.
+// Top of the supply stack = realized circulating. The hatched orange wedge
+// at the floor marks "this much was minted then retired." Singularity Fork
+// is an annotation only — it eliminated FUTURE unlocks that were never
+// minted, so there's nothing to draw as a wedge.
 
 export function SupplyStoryChart({
   from,
@@ -64,18 +65,6 @@ export function SupplyStoryChart({
 
   const last = data?.[data.length - 1];
 
-  // Conditional y-axis floor: if realized stays above FLOOR across the whole
-  // visible window, crop the y-axis so the variation isn't squashed against
-  // the top. Falls back to a 0-baseline when any sample dips below FLOOR
-  // (e.g. the "all" timeframe which includes the launch ramp from zero) so
-  // the early curve still has room to render.
-  const Y_FLOOR = 400_000_000;
-  const yMin = useMemo(() => {
-    if (!chartData.length) return 0;
-    const minRealized = Math.min(...chartData.map((d) => d.realized));
-    return minRealized >= Y_FLOOR ? Y_FLOOR : 0;
-  }, [chartData]);
-
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
@@ -92,14 +81,8 @@ export function SupplyStoryChart({
               <span className="font-medium text-orange-600 dark:text-orange-300">
                 SOAP burn
               </span>
-              {" "}(hatched) — minted then sent to <code>0x0050AF…</code> and
-              subtracted off the top.
-            </li>
-            <li>
-              <span className="font-medium text-slate-900/80 dark:text-white/80">
-                Top of stack
-              </span>
-              {" "}= gross minted (realized + burn).
+              {" "}(hatched overlay at the floor) — minted QUAI sent to{" "}
+              <code>0x0050AF…</code> and retired.
             </li>
           </ul>
         </div>
@@ -111,15 +94,17 @@ export function SupplyStoryChart({
                 Realized
               </span>
               : <code>quaiSupplyTotal</code> from the RPC. Already net of SOAP
-              burn server-side — no client-side subtraction.
+              burn server-side — no client-side subtraction. Top of the blue
+              area is what's actually circulating today.
             </li>
             <li>
               <span className="font-medium text-orange-600 dark:text-orange-300">
                 SOAP burn
               </span>
               : <code>balanceOf(0x0050AF…)</code>. The sole authoritative burn
-              signal. Stacked above realized so the top edge equals gross
-              minted.
+              signal. Drawn as a hatched overlay starting at the floor (y=0)
+              — visually subtractive, marking the slice of supply that's been
+              retired without lifting the realized line.
             </li>
           </ul>
           <p className="mt-2">
@@ -190,8 +175,6 @@ export function SupplyStoryChart({
                 tickLine={false}
                 axisLine={false}
                 width={64}
-                domain={[yMin, "auto"]}
-                allowDataOverflow={yMin > 0}
               />
               <Tooltip
                 content={
@@ -220,8 +203,8 @@ export function SupplyStoryChart({
               <Area
                 type="monotone"
                 dataKey="burn"
-                name="SOAP burn (subtracted)"
-                stackId="supply"
+                name="SOAP burn (overlay)"
+                stackId="burn"
                 stroke="#f97316"
                 strokeWidth={1.4}
                 strokeDasharray="4 3"

@@ -26,9 +26,9 @@ import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
 import { cn } from "@/lib/utils";
 
 const DECOMPOSITION_LEGEND = [
+  { label: "Eaten by SOAP burn", color: "#f97316", dasharray: "4 3" },
   { label: "Genesis (unlocked)", color: "#a855f7" },
-  { label: "Mined", color: "#06b6d4" },
-  { label: "SOAP burn (subtracted)", color: "#f97316", dasharray: "4 3" },
+  { label: "Mined (gross)", color: "#06b6d4" },
 ];
 
 // Projection assumptions (locked-in user inputs):
@@ -41,11 +41,23 @@ const DECOMPOSITION_LEGEND = [
 //   • SOAP burn: trailing 4-week average burn velocity, projected linearly.
 //     Foundation/governance can change this; documented in the popover.
 const PROJECTION_YEARS = 6;
+// Gross mining issuance per day. Net mining = gross × (1 − efficiency).
 const MINING_PER_DAY_WEI = 800_000n * 10n ** 18n;
 const GENESIS_TARGET_POST_SINGULARITY_WEI = 1_332_840_016n * 10n ** 18n;
 const GENESIS_TARGET_NO_SINGULARITY_WEI = 3_000_000_000n * 10n ** 18n;
 const VESTING_END_DATE = "2029-02-01";
-const BURN_AVG_WINDOW_DAYS = 28;
+
+// SOAP efficiency = % of gross mining that gets burned.
+//   • 90%  — burn 720 K/day,  net 80 K/day  → cyan grows slowly
+//   • 100% — burn 800 K/day,  net  0 K/day  → cyan is flat
+//   • 110% — burn 880 K/day,  net –80 K/day → cyan shrinks (clamped ≥ 0)
+type BurnMode = "eff90" | "eff100" | "eff110";
+
+const EFFICIENCY_MODES: { key: BurnMode; label: string; pct: bigint }[] = [
+  { key: "eff90", label: "90%", pct: 90n },
+  { key: "eff100", label: "100%", pct: 100n },
+  { key: "eff110", label: "110%", pct: 110n },
+];
 
 // SupplyDecompositionChart — three-layer breakdown of the same silhouette
 // drawn by SupplyStoryChart. Stacks bottom→top:
@@ -84,6 +96,7 @@ export function SupplyDecompositionChart({
 }) {
   const [forecast, setForecast] = useState(false);
   const [noSingularity, setNoSingularity] = useState(false);
+  const [burnMode, setBurnMode] = useState<BurnMode>("eff90");
 
   const { data, isLoading, error } = useSupply({
     period: "day",
@@ -94,32 +107,41 @@ export function SupplyDecompositionChart({
 
   const lastRow = data?.[data.length - 1];
 
-  // Trailing-window burn velocity in wei/day. Used only when forecasting.
+  // Daily burn velocity = SOAP efficiency × gross mining rate.
   const burnPerDayWei = useMemo(() => {
-    if (!data || data.length < 2) return 0n;
-    const tail = data.slice(-BURN_AVG_WINDOW_DAYS);
-    if (tail.length < 2) return 0n;
-    const first = tail[0];
-    const last = tail[tail.length - 1];
-    const span = daysBetween(first.periodStart, last.periodStart);
-    if (span <= 0) return 0n;
-    const delta = (last.burnClose ?? 0n) - (first.burnClose ?? 0n);
-    return delta > 0n ? delta / BigInt(span) : 0n;
-  }, [data]);
+    const eff = EFFICIENCY_MODES.find((m) => m.key === burnMode);
+    if (!eff) return 0n;
+    return (MINING_PER_DAY_WEI * eff.pct) / 100n;
+  }, [burnMode]);
 
   const chartData = useMemo(() => {
     if (!data) return [];
 
+    // Visualization: stacked positive areas, bottom → top:
+    //   1. genesis (purple)        = true genesis_unlocked
+    //   2. burn (hatched orange)   = mined-then-retired wedge
+    //   3. mined_net (cyan)        = mining still in circulation
+    //
+    // Stack top = genesis_unlocked + burn + mined_net = genesis + gross_mined
+    // = gross-ever-issued, same silhouette as SupplyStoryChart. The burn
+    // sits visually BETWEEN genesis and active mining — reading as "this
+    // slice was mined but has since been carved out." Cyan above it is
+    // what mining has actually contributed to circulating supply today.
     const historical = data.map((r) => {
       const burn = r.burnClose ?? 0n;
-      const mined = r.cumulativeMinedQuai ?? 0n;
-      const genesisRaw = r.quaiTotalEnd - mined;
-      const genesis = genesisRaw > 0n ? genesisRaw : 0n;
+      const grossMined = r.cumulativeMinedQuai ?? 0n;
+      const minedNet = grossMined > burn ? grossMined - burn : 0n;
+      // Genesis is keyed off mined_net so realized circulating math stays
+      // consistent (genesis + mined_net = realized). The cyan layer paints
+      // gross mining though, which means the stack top now equals
+      // genesis + gross — matching SupplyStoryChart's gross-ever-issued top.
+      const genesisRaw =
+        r.quaiTotalEnd > minedNet ? r.quaiTotalEnd - minedNet : 0n;
       return {
         date: r.periodStart,
-        mined: weiToFloat(mined, 0),
-        genesis: weiToFloat(genesis, 0),
+        genesis: weiToFloat(genesisRaw, 0),
         burn: weiToFloat(burn, 0),
+        mined: weiToFloat(grossMined, 0),
       };
     });
 
@@ -129,8 +151,13 @@ export function SupplyDecompositionChart({
     const anchorDate = lastRow.periodStart;
     const anchorMined = lastRow.cumulativeMinedQuai ?? 0n;
     const anchorBurn = lastRow.burnClose ?? 0n;
-    const anchorGenesisRaw = lastRow.quaiTotalEnd - anchorMined;
-    const anchorGenesis = anchorGenesisRaw > 0n ? anchorGenesisRaw : 0n;
+    const anchorMinedNet =
+      anchorMined > anchorBurn ? anchorMined - anchorBurn : 0n;
+    // True genesis unlocked at the anchor — what we project from.
+    const anchorGenesisRaw = lastRow.quaiTotalEnd > anchorMinedNet
+      ? lastRow.quaiTotalEnd - anchorMinedNet
+      : 0n;
+    const anchorGenesis = anchorGenesisRaw;
 
     const horizonDate = addDays(anchorDate, PROJECTION_YEARS * 365);
     const vestingDaysRemaining = Math.max(
@@ -152,7 +179,8 @@ export function SupplyDecompositionChart({
     for (let dayOffset = 7; dayOffset <= totalDays; dayOffset += 7) {
       const date = addDays(anchorDate, dayOffset);
 
-      const minedWei = anchorMined + MINING_PER_DAY_WEI * BigInt(dayOffset);
+      const grossMinedWei =
+        anchorMined + MINING_PER_DAY_WEI * BigInt(dayOffset);
       const burnWei = anchorBurn + burnPerDayWei * BigInt(dayOffset);
 
       // Genesis: linear ramp until vesting end, flat thereafter.
@@ -162,9 +190,9 @@ export function SupplyDecompositionChart({
 
       projection.push({
         date,
-        mined: weiToFloat(minedWei, 0),
         genesis: weiToFloat(genesisWei, 0),
         burn: weiToFloat(burnWei, 0),
+        mined: weiToFloat(grossMinedWei, 0),
       });
     }
 
@@ -179,10 +207,9 @@ export function SupplyDecompositionChart({
     };
   }, [forecast, lastRow]);
 
-  // First row where mined exceeds (genesis − burn). This is the moment
-  // mining issuance overtakes the net premine pressure on supply — i.e.
-  // when the chain becomes "mostly miner-issued" relative to what's left
-  // of the genesis allocation after accounting for buyback burn.
+  // First row where the cyan layer (gross mined) exceeds the visible
+  // genesis minus the orange overlay — a literal reading of the chart:
+  // cyan area taller than (purple area − hatched bite at the floor).
   const crossoverDate = useMemo(() => {
     for (const r of chartData) {
       if (r.mined > r.genesis - r.burn) return r.date;
@@ -199,26 +226,57 @@ export function SupplyDecompositionChart({
           <CardTitle>QUAI supply decomposition</CardTitle>
           <ul className="mt-1 max-w-xl space-y-0.5 text-xs text-slate-900/80 dark:text-white/80">
             <li>
-              <span className="font-medium text-cyan-600 dark:text-cyan-300">
-                Mined
-              </span>
-              {" "}— cumulative block + workshare rewards.
-            </li>
-            <li>
               <span className="font-medium text-purple-600 dark:text-purple-300">
                 Genesis
               </span>
               {" "}— vesting unlocks; visible jumps at the 6-month and 1-year cliffs.
             </li>
             <li>
-              <span className="font-medium text-orange-600 dark:text-orange-300">
-                SOAP burn
+              <span className="font-medium text-cyan-600 dark:text-cyan-300">
+                Mined (gross)
               </span>
-              {" "}(hatched) — minted then sent to <code>0x0050AF…</code>.
+              {" "}— total mining issuance, stacked on top of genesis.
+            </li>
+            <li>
+              <span className="font-medium text-orange-600 dark:text-orange-300">
+                Eaten by burn
+              </span>
+              {" "}(hatched overlay at the floor) — supply slice retired by buyback.
             </li>
           </ul>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {forecast && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
+                SOAP eff
+              </span>
+              <div
+                role="group"
+                aria-label="Burn as percent of gross mining"
+                className="flex overflow-hidden rounded-md border border-slate-300/70 dark:border-white/15"
+              >
+                {EFFICIENCY_MODES.map((m, i) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setBurnMode(m.key)}
+                    aria-pressed={burnMode === m.key}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium transition",
+                      i > 0 && "border-l border-slate-300/70 dark:border-white/15",
+                      burnMode === m.key
+                        ? "bg-orange-500/10 text-orange-700 dark:bg-orange-400/10 dark:text-orange-200"
+                        : "text-slate-700 hover:bg-slate-100 dark:text-white/70 dark:hover:bg-white/5",
+                    )}
+                    title={`Burn at ${m.label} of 800 K/day gross mining`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {forecast && (
             <button
               type="button"
@@ -239,7 +297,10 @@ export function SupplyDecompositionChart({
             type="button"
             onClick={() => {
               setForecast((v) => {
-                if (v) setNoSingularity(false);
+                if (v) {
+                  setNoSingularity(false);
+                  setBurnMode("eff90");
+                }
                 return !v;
               });
             }}
@@ -261,33 +322,40 @@ export function SupplyDecompositionChart({
             </p>
             <ul className="mt-2 list-disc pl-4 text-slate-900/70 dark:text-white/70">
               <li>
-                <span className="font-medium text-cyan-600 dark:text-cyan-300">
-                  Mined
-                </span>
-                : window-sum of{" "}
-                <code>base_block_reward_sum + workshare_reward_avg × workshare_total</code>{" "}
-                across rollups.
-              </li>
-              <li>
                 <span className="font-medium text-purple-600 dark:text-purple-300">
                   Genesis
-                </span>
-                : <code>quaiTotalEnd − cumulativeMinedQuai</code> (clamped ≥ 0).
-                Captures vesting-cliff unlocks as they enter on-chain supply —
-                TGE baseline (~478 M), 6-month cliff (~+30 M on 2025-08-04),
-                1-year cliff (~+200 M on 2026-02-03).
+                </span>{" "}
+                (bottom): <code>quaiTotalEnd − minedNet</code>. True genesis-unlocked
+                premine — captures vesting-cliff unlocks (TGE baseline ~478 M,
+                6-month cliff ~+30 M on 2025-08-04, 1-year cliff ~+200 M on 2026-02-03).
+                Plateaus at ~1.333 B post-2029-02-01 (vesting complete).
+              </li>
+              <li>
+                <span className="font-medium text-cyan-600 dark:text-cyan-300">
+                  Mined (gross)
+                </span>{" "}
+                (top): <code>cumulativeMinedQuai</code>. Total mining
+                issuance ever, stacked directly on genesis. Top of stack =
+                genesis + gross-mined = gross-ever-issued (matches the supply
+                story silhouette above). Realized circulating = stack top
+                minus burn overlay.
               </li>
               <li>
                 <span className="font-medium text-orange-600 dark:text-orange-300">
-                  SOAP burn
-                </span>
-                : <code>balanceOf(0x0050AF…)</code>. Stacked above so the
-                silhouette matches the chart above.
+                  Eaten by burn
+                </span>{" "}
+                (overlay): <code>burnClose</code>. Drawn as a separate hatched
+                area at the floor of the chart, overlapping the bottom of
+                genesis. Visually marks "this slice has been retired" without
+                pushing the supply layers up — so genesis really does plateau
+                flat past the vesting-complete line.
               </li>
             </ul>
             <p className="mt-2 font-medium">Forecast assumptions</p>
             <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">
-              <li>Mining: <strong>800 000 QUAI/day</strong> flat for 6 yr.</li>
+              <li>
+                Gross mining: <strong>800 K QUAI/day</strong> flat for 6 yr.
+              </li>
               <li>
                 Genesis: linear ramp from today to{" "}
                 <strong>1.333 B QUAI</strong> by{" "}
@@ -295,9 +363,22 @@ export function SupplyDecompositionChart({
                 baseline), flat thereafter.
               </li>
               <li>
-                SOAP burn: trailing {BURN_AVG_WINDOW_DAYS}-day average burn
-                velocity, projected linearly. Foundation can change the
-                burn/vault split at any time.
+                SOAP burn: <strong>burn = SOAP efficiency × gross
+                mining</strong>. Net mining = gross − burn.
+                <ul className="mt-1 list-disc pl-4">
+                  <li>
+                    <strong>90%</strong> — burn 720 K/day, net 80 K/day. Cyan
+                    grows slowly.
+                  </li>
+                  <li>
+                    <strong>100%</strong> — burn 800 K/day, net 0/day. Cyan
+                    plateaus exactly at today's height.
+                  </li>
+                  <li>
+                    <strong>110%</strong> — burn 880 K/day, net −80 K/day.
+                    Cyan shrinks until clamped at 0 (~2.6 yr from anchor).
+                  </li>
+                </ul>
               </li>
             </ul>
             <p className="mt-2 font-medium">"Without Singularity" mode</p>
@@ -405,8 +486,8 @@ export function SupplyDecompositionChart({
                     position: "insideTop",
                     fill: "#a855f7",
                     fontSize: 11,
-                    textAnchor: "end",
-                    dx: -4,
+                    textAnchor: "start",
+                    dx: 4,
                   }}
                 />
               )}
@@ -440,7 +521,7 @@ export function SupplyDecompositionChart({
               <Area
                 type="monotone"
                 dataKey="mined"
-                name="Mined"
+                name="Mined (gross)"
                 stackId="supply"
                 stroke="#06b6d4"
                 fill="#06b6d4"
@@ -452,8 +533,8 @@ export function SupplyDecompositionChart({
               <Area
                 type="monotone"
                 dataKey="burn"
-                name="SOAP burn (subtracted)"
-                stackId="supply"
+                name="Eaten by SOAP burn"
+                stackId="burn"
                 stroke="#f97316"
                 strokeWidth={1.4}
                 strokeDasharray="4 3"
@@ -468,17 +549,28 @@ export function SupplyDecompositionChart({
       </div>
 
       {lastRow && (() => {
-        const minedLast = lastRow.cumulativeMinedQuai ?? 0n;
-        const genesisLast = lastRow.quaiTotalEnd > minedLast
-          ? lastRow.quaiTotalEnd - minedLast
+        const grossMined = lastRow.cumulativeMinedQuai ?? 0n;
+        const burnLast = lastRow.burnClose ?? 0n;
+        const minedNet = grossMined > burnLast ? grossMined - burnLast : 0n;
+        const genesisLast = lastRow.quaiTotalEnd > grossMined
+          ? lastRow.quaiTotalEnd - grossMined
           : 0n;
         return (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-slate-900/50 dark:text-white/50">
             <span>
               Latest {formatPeriodDate(lastRow.periodStart)}: mined{" "}
               <span className="font-mono text-slate-900/80 dark:text-white/80">
-                {formatCompact(weiToFloat(minedLast, 0))} QUAI
-              </span>
+                {formatCompact(weiToFloat(grossMined, 0))}
+              </span>{" "}
+              − burn{" "}
+              <span className="font-mono text-slate-900/80 dark:text-white/80">
+                {formatCompact(weiToFloat(burnLast, 0))}
+              </span>{" "}
+              ={" "}
+              <span className="font-mono text-cyan-700 dark:text-cyan-300">
+                {formatCompact(weiToFloat(minedNet, 0))} QUAI
+              </span>{" "}
+              net
             </span>
             <span>
               genesis{" "}
@@ -486,23 +578,28 @@ export function SupplyDecompositionChart({
                 {formatCompact(weiToFloat(genesisLast, 0))} QUAI
               </span>
             </span>
-            <span>
-              burned{" "}
-              <span className="font-mono text-slate-900/80 dark:text-white/80">
-                {formatCompact(weiToFloat(lastRow.burnClose ?? 0n, 0))} QUAI
-              </span>
-            </span>
-            {forecast && (
-              <span className="text-cyan-700 dark:text-cyan-300">
-                Forecast: 800 K mined/day · burn ≈{" "}
-                {formatCompact(weiToFloat(burnPerDayWei * 7n, 0))} QUAI/wk
-                {noSingularity && (
-                  <span className="ml-2 text-purple-700 dark:text-purple-300">
-                    · genesis target 3 B (no Singularity)
+            {forecast && (() => {
+              const mode = EFFICIENCY_MODES.find((m) => m.key === burnMode);
+              const netRateWei = MINING_PER_DAY_WEI > burnPerDayWei
+                ? MINING_PER_DAY_WEI - burnPerDayWei
+                : 0n;
+              return (
+                <span className="text-cyan-700 dark:text-cyan-300">
+                  Forecast: 800 K gross mined/day · burn ≈{" "}
+                  {formatCompact(weiToFloat(burnPerDayWei * 7n, 0))} QUAI/wk
+                  {" "}
+                  <span className="text-slate-900/55 dark:text-white/55">
+                    ({mode?.label} of gross) · net{" "}
+                    {formatCompact(weiToFloat(netRateWei, 0))}/day
                   </span>
-                )}
-              </span>
-            )}
+                  {noSingularity && (
+                    <span className="ml-2 text-purple-700 dark:text-purple-300">
+                      · genesis target 3 B (no Singularity)
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
           </div>
         );
       })()}
