@@ -41,6 +41,12 @@ const GRAIN_TO_VIEW: Record<string, string> = {
   month: "v_supply_monthly",
 };
 
+const GRAIN_TO_ROLLUP: Record<string, string> = {
+  day: "rollups_daily",
+  week: "rollups_weekly",
+  month: "rollups_monthly",
+};
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS = 3000;
 
@@ -55,6 +61,7 @@ type SupplyRow = {
   burn_close: string;
   burn_delta: string;
   realized_circulating_quai: string;
+  cumulative_mined: string | null;
 };
 
 export async function GET(req: Request) {
@@ -80,20 +87,53 @@ export async function GET(req: Request) {
       );
     }
 
-    const { rows } = await pool.query<SupplyRow>(
-      `SELECT
-         to_char(period_start, 'YYYY-MM-DD') AS period_start,
-         first_block::text, last_block::text, block_count, partial,
-         quai_total_end::text,
-         qi_total_end::text,
-         burn_close::text, burn_delta::text,
-         realized_circulating_quai::text
-       FROM ${view}
-       WHERE period_start >= $1::date AND period_start <= $2::date
-       ORDER BY period_start ASC
-       LIMIT ${MAX_ROWS}`,
-      [from, to],
-    );
+    // Cumulative mining issuance (block reward + workshare reward) summed
+    // over ALL prior periods, then filtered to the requested window. This
+    // lets charts decompose realized supply into mining issuance vs.
+    // genesis vesting unlocks. The window-sum runs over the full table —
+    // that's only a few hundred to a few thousand rows per grain, so it's
+    // cheap. Without this, a window starting at e.g. 2026-01-01 would
+    // restart cumulative_mined from zero on that date.
+    const wantsMined = include.has("mined");
+    const rollupTable = GRAIN_TO_ROLLUP[period];
+
+    const sql = wantsMined
+      ? `WITH mined AS (
+           SELECT
+             period_start,
+             SUM(
+               COALESCE(base_block_reward_sum, 0)
+               + COALESCE(workshare_reward_avg * workshare_total, 0)
+             ) OVER (ORDER BY period_start) AS cumulative_mined
+           FROM ${rollupTable}
+         )
+         SELECT
+           to_char(v.period_start, 'YYYY-MM-DD') AS period_start,
+           v.first_block::text, v.last_block::text, v.block_count, v.partial,
+           v.quai_total_end::text,
+           v.qi_total_end::text,
+           v.burn_close::text, v.burn_delta::text,
+           v.realized_circulating_quai::text,
+           m.cumulative_mined::text AS cumulative_mined
+         FROM ${view} v
+         JOIN mined m USING (period_start)
+         WHERE v.period_start >= $1::date AND v.period_start <= $2::date
+         ORDER BY v.period_start ASC
+         LIMIT ${MAX_ROWS}`
+      : `SELECT
+           to_char(period_start, 'YYYY-MM-DD') AS period_start,
+           first_block::text, last_block::text, block_count, partial,
+           quai_total_end::text,
+           qi_total_end::text,
+           burn_close::text, burn_delta::text,
+           realized_circulating_quai::text,
+           NULL::text AS cumulative_mined
+         FROM ${view}
+         WHERE period_start >= $1::date AND period_start <= $2::date
+         ORDER BY period_start ASC
+         LIMIT ${MAX_ROWS}`;
+
+    const { rows } = await pool.query<SupplyRow>(sql, [from, to]);
 
     // Genesis baseline is a step function — flat 3 B QUAI before Singularity,
     // (3 B − 1.667 B) = 1.333 B after. We expose it as a column so charts can
@@ -121,6 +161,9 @@ export async function GET(req: Request) {
       if (include.has("genesis")) {
         out.genesisBaselineQuai =
           r.period_start >= SINGULARITY_FORK_DATE ? genesisPost : genesisPre;
+      }
+      if (include.has("mined") && r.cumulative_mined != null) {
+        out.cumulativeMinedQuai = BigInt(r.cumulative_mined);
       }
       return out;
     });

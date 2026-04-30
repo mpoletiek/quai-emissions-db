@@ -88,16 +88,15 @@ The example file (`.env.local.example`) is the canonical reference. The
 
 ## Routes
 
-The dashboard lives entirely under `/dashboard`. Legacy `/history` and
-`/live` redirect (308) to `/dashboard/history` and `/dashboard/live` with
-query strings preserved.
+The dashboard lives entirely under `/dashboard`. Legacy `/history`
+redirects (308) to `/dashboard/history` with query strings preserved.
+The root `/` redirects to `/dashboard`.
 
 | route | audience | content |
 |---|---|---|
 | `/dashboard` | holders | Hero (6 KPIs) · SOAP + Singularity callouts · supply story · Qi cumulative · mining-issuance-since-SOAP · QUAI vs Bitcoin emission curves to 2050 |
-| `/dashboard/mining` | miners | Hero (4 KPIs) · per-algorithm composition flagship · hashrate · difficulty · block reward · uncled ratio · top coinbases (last 7d) |
+| `/dashboard/mining` | miners | Hero (4 KPIs) · per-algorithm composition flagship · QUAI rewarded per algorithm · hashrate · block reward · top coinbases (last 7d) |
 | `/dashboard/history` | analysts | URL-state-driven period × range slicer with the legacy 8-chart grid |
-| `/dashboard/live` | devs / chain integrators | Hero (4 KPIs) · block-interval scatter with reorg markers · recent blocks feed · reorg log · live emission charts |
 
 ---
 
@@ -109,13 +108,11 @@ Internal-stable. Documented for transparency, not contract.
 |---|---|---|
 | `/api/health` | head block, ingest cursor lag, backfill flag | 5 s |
 | `/api/stats` | live `quai_getMiningInfo` + supply analytics from store | 30 s |
-| `/api/blocks?limit=N` | last N blocks from `blocks` table | 15 s |
 | `/api/emissions?limit=N` | per-block emissions joined with analytics | 15 s |
 | `/api/rollups?period=&from=&to=` | period aggregates from `rollups_*` | 30 s + 5 m SWR |
 | `/api/rollups/meta` | rollup date bounds and row counts | 60 s |
 | `/api/supply?period=&from=&to=&include=qi,burn,genesis` | realized-circulating math from `v_supply_*` views | 60 s + 5 m SWR |
 | `/api/coinbase-leaderboard?days=&limit=` | top coinbases by blocks won | 5 m |
-| `/api/reorgs?limit=&before=` | paginated reorg log + last-24h count | 60 s |
 
 ---
 
@@ -184,15 +181,14 @@ the full source-verified treatment with go-quai pointers.
 
 ```
 app/
-  api/          route handlers (health, stats, blocks, rollups, supply, …)
-  dashboard/    home + mining + history + live pages, with shared layout
+  api/          route handlers (health, stats, rollups, supply, …)
+  dashboard/    home + mining + history pages, with shared layout
   layout.tsx    root layout (theme provider + top nav + react-query)
 components/
   dashboard/
     home/       home-page charts and callouts (Soap/Singularity)
     mining/     mining-page charts and tables
     history/    legacy v1 chart components reused across history surfaces
-    live/       block-interval scatter, recent-blocks feed, reorg-log table
     shared/     HeroStrip, FreshnessLabel, SamplingFootnote, TimeframeToggle, DashboardSubNav
   ui/           Card, ThemeToggle, InfoPopover
   layout/       TopNav
@@ -200,7 +196,7 @@ lib/
   comparisons/  Bitcoin schedule, Quai cap projection
   quai/         protocol constants, types, format, store, conversion math
   format.ts     human-readable formatters
-  hooks.ts      React Query hooks (useStats, useBlocks, useRollups, useSupply, useReorgs, …)
+  hooks.ts      React Query hooks (useStats, useRollups, useSupply, …)
 migrations/     SQL migrations — see migrations/README.md
 scripts/
   ingest/       run.ts (unified worker) + backfill.ts + rollup.ts + helpers

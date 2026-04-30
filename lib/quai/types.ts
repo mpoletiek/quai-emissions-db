@@ -216,6 +216,7 @@ export type SupplyRow = {
   burnClose?: bigint;
   burnDelta?: bigint;
   genesisBaselineQuai?: bigint;
+  cumulativeMinedQuai?: bigint;
 };
 
 export type GrainMeta = {

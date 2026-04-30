@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { HomeHero } from "@/components/dashboard/home/HomeHero";
 import { SupplyStoryChart } from "@/components/dashboard/home/SupplyStoryChart";
+import { SupplyDecompositionChart } from "@/components/dashboard/home/SupplyDecompositionChart";
 import { SoapMiningChart } from "@/components/dashboard/home/SoapMiningChart";
 import { EmissionsComparisonChart } from "@/components/dashboard/home/EmissionsComparisonChart";
 import { QiCumulativeChart } from "@/components/dashboard/home/QiCumulativeChart";
@@ -84,6 +85,7 @@ export default function DashboardHomePage() {
 
       <div className="fade-in-stagger space-y-6">
         <SupplyStoryChart from={flagshipFrom} to={flagshipTo} />
+        <SupplyDecompositionChart from={flagshipFrom} to={flagshipTo} />
         <QiCumulativeChart from={flagshipFrom} to={flagshipTo} />
         <SoapMiningChart to={flagshipTo} />
         <EmissionsComparisonChart />

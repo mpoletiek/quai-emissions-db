@@ -16,7 +16,6 @@ const TABS = [
   { href: "/dashboard", label: "Home", exact: true },
   { href: "/dashboard/mining", label: "Mining" },
   { href: "/dashboard/history", label: "History" },
-  { href: "/dashboard/live", label: "Live" },
 ];
 
 function isActive(pathname: string | null, t: { href: string; exact?: boolean }) {

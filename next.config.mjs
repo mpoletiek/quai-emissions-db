@@ -8,7 +8,6 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/history", destination: "/dashboard/history", permanent: true },
-      { source: "/live", destination: "/dashboard/live", permanent: true },
     ];
   },
 };

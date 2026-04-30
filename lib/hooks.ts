@@ -4,7 +4,6 @@ import { reviveBig } from "@/lib/quai/serialize";
 import type {
   Emission,
   MiningInfo,
-  NormalizedBlock,
   Period,
   Rollup,
   RollupsMeta,
@@ -195,44 +194,12 @@ export function useCoinbaseLeaderboard(args: { days?: number; limit?: number } =
   });
 }
 
-export type ReorgRow = {
-  id: string;
-  detectedAt: string;
-  detectionMode: string;
-  divergeFrom: number;
-  cursorBefore: number;
-  oldHash: string | null;
-  newHash: string | null;
-  note: string | null;
-};
-
-export type ReorgsPayload = {
-  last24h: number;
-  rows: ReorgRow[];
-  nextCursor: string | null;
-};
-
-export function useReorgs(args: { limit?: number } = {}) {
-  const limit = args.limit ?? 50;
-  return useQuery<ReorgsPayload>({
-    queryKey: ["reorgs", limit],
-    queryFn: async () => {
-      const res = await fetch(`/api/reorgs?limit=${limit}`);
-      if (!res.ok) throw new Error(`reorgs ${res.status}`);
-      return (await res.json()) as ReorgsPayload;
-    },
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: false,
-  });
-}
-
 /** Hook for /api/supply (realized circulating + optional qi/burn/genesis). */
 export function useSupply(args: {
   period: Period;
   from: string;
   to: string;
-  include?: ("qi" | "burn" | "genesis")[];
+  include?: ("qi" | "burn" | "genesis" | "mined")[];
 }) {
   const include = (args.include ?? ["qi", "burn"]).join(",");
   return useQuery<SupplyRow[]>({
@@ -252,21 +219,3 @@ export function useSupply(args: {
   });
 }
 
-export type BlocksPayload = { latest: number; count: number; blocks: NormalizedBlock[] };
-
-export function useBlocks(limit = 500) {
-  return useQuery<BlocksPayload>({
-    queryKey: ["blocks", limit],
-    queryFn: async () => {
-      const res = await fetch(`/api/blocks?limit=${limit}`);
-      if (!res.ok) throw new Error(`blocks ${res.status}`);
-      const raw = await res.json();
-      return {
-        latest: raw.latest,
-        count: raw.count,
-        blocks: reviveBig<NormalizedBlock[]>(raw.blocks),
-      };
-    },
-    refetchInterval: BLOCKS_REFRESH_MS,
-  });
-}
