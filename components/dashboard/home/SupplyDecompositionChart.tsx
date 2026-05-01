@@ -119,9 +119,10 @@ export function SupplyDecompositionChart({
     const horizonDate = addDays(anchorDate, PROJECTION_YEARS * 365);
     const projection: typeof historical = [];
     const totalDays = daysBetween(anchorDate, horizonDate);
-    // Step every ~7d. Schedule unlocks every 30d so the staircase survives
-    // at this cadence.
-    for (let dayOffset = 7; dayOffset <= totalDays; dayOffset += 7) {
+    // Daily granularity to match the historical series — sparser sampling
+    // makes recharts' line interpolation look kinked at the anchor and
+    // visually flattens the projection slope.
+    for (let dayOffset = 1; dayOffset <= totalDays; dayOffset += 1) {
       const date = addDays(anchorDate, dayOffset);
 
       const grossMinedWei =
@@ -174,6 +175,23 @@ export function SupplyDecompositionChart({
     }
     return null;
   }, [chartData, forecast]);
+
+  // Even-spaced tick marks: pick the first chartData row landing on each
+  // calendar half-year (Jan 1 / Jul 1). With ~2,700 daily rows on a
+  // category-based axis, this guarantees ticks at consistent calendar
+  // boundaries instead of recharts' auto-placed defaults.
+  const xAxisTicks = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of chartData) {
+      const md = r.date.slice(5); // "MM-DD"
+      if ((md === "01-01" || md === "07-01") && !seen.has(r.date)) {
+        seen.add(r.date);
+        out.push(r.date);
+      }
+    }
+    return out;
+  }, [chartData]);
 
   const visibleTo = forecast && projectionRange ? projectionRange.to : to;
 
@@ -307,7 +325,8 @@ export function SupplyDecompositionChart({
                 tickFormatter={formatPeriodDate}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={48}
+                ticks={xAxisTicks}
+                interval={0}
               />
               <YAxis
                 tick={{ fill: "var(--chart-axis)", fontSize: 11 }}

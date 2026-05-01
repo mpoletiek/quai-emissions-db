@@ -26,26 +26,33 @@ export function ProtocolEventLines({
   visibleTo: string;
   yAxisId?: string;
 }) {
+  const visible = PROTOCOL_EVENTS.filter(
+    (e) => e.date >= visibleFrom && e.date <= visibleTo,
+  );
+  // Stagger labels through 3 vertical lanes from the chart-top default.
+  // SOAP, 1Y Cliff, and Singularity hit within ~3 months and otherwise
+  // stack on top of each other; rotating through lanes keeps them legible.
+  const LANE_HEIGHT = 14;
+  const LANES = 3;
   return (
     <>
-      {PROTOCOL_EVENTS.filter((e) => e.date >= visibleFrom && e.date <= visibleTo).map(
-        (e) => (
-          <ReferenceLine
-            key={e.date}
-            x={e.date}
-            yAxisId={yAxisId}
-            stroke={e.color}
-            strokeDasharray="3 3"
-            strokeOpacity={0.6}
-            label={{
-              value: e.label,
-              position: "insideTopRight",
-              fill: e.color,
-              fontSize: 10,
-            }}
-          />
-        ),
-      )}
+      {visible.map((e, i) => (
+        <ReferenceLine
+          key={e.date}
+          x={e.date}
+          yAxisId={yAxisId}
+          stroke={e.color}
+          strokeDasharray="3 3"
+          strokeOpacity={0.6}
+          label={{
+            value: e.label,
+            position: "insideTopRight",
+            fill: e.color,
+            fontSize: 10,
+            dy: (i % LANES) * LANE_HEIGHT,
+          }}
+        />
+      ))}
     </>
   );
 }
