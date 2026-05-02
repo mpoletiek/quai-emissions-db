@@ -4,6 +4,7 @@ import { serializeBig } from "@/lib/quai/serialize";
 import { storeLatestAnalytics } from "@/lib/store";
 import { WEI_PER_TOKEN } from "@/lib/quai/constants";
 import type { SupplyInfo } from "@/lib/quai/types";
+import { apiServerError } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -38,7 +39,6 @@ export async function GET() {
       },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return apiServerError("api/stats", err);
   }
 }

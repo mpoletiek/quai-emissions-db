@@ -14,6 +14,16 @@ declare global {
   var __quaiPgPool: Pool | undefined;
 }
 
+// `statement_timeout` (ms) — server-enforced cap so a single slow query
+// can't hold a connection forever and starve the pool. Pair with the
+// app-level date-range cap in lib/api-helpers.ts. `query_timeout` is the
+// client-side counterpart; `connectionTimeoutMillis` bounds connect.
 export const pool: Pool =
   globalThis.__quaiPgPool ??
-  (globalThis.__quaiPgPool = new Pool({ connectionString: url, max: 10 }));
+  (globalThis.__quaiPgPool = new Pool({
+    connectionString: url,
+    max: 10,
+    statement_timeout: 10_000,
+    query_timeout: 12_000,
+    connectionTimeoutMillis: 5_000,
+  }));

@@ -18,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
@@ -49,9 +49,6 @@ export function BlockRewardChart({ from, to }: { from: string; to: string }) {
         <CardTitle>Block reward</CardTitle>
         <SamplingFootnote kind="averaged" />
       </div>
-      <p className="mt-1 text-xs text-slate-900/80 dark:text-white/80">
-        Average base block reward and per-workshare reward, in QUAI.
-      </p>
 
       <ChartLegend items={BLOCK_REWARD_LEGEND} className="mt-2" />
 

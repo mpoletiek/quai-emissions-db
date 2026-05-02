@@ -2,8 +2,6 @@ import { ReferenceLine } from "recharts";
 
 // Key dates to annotate on time-series charts. ISO YYYY-MM-DD to match the
 // chart's X-axis dataKey ("date"), which is also YYYY-MM-DD period_start.
-// Exported so `ProtocolEventsLegend` can render matching swatches at the page
-// level — keeps the two surfaces in lockstep.
 export const PROTOCOL_EVENTS = [
   { date: "2025-04-16", label: "Qi Launch", color: "#14b8a6", slug: "qi" },
   { date: "2025-12-17", label: "SOAP", color: "#f97316", slug: "soap" },

@@ -17,7 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
 import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
@@ -197,81 +197,7 @@ export function SoapMiningChart({ to }: { to: string }) {
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <CardTitle>QUAI mining vs SOAP burn since SOAP</CardTitle>
-          {showSimSeries ? (
-            <div className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
-              <p>
-                <span className="font-medium">What-if:</span> every miner
-                locks rewards for{" "}
-                <span className="font-medium">{LOCKUP_LABELS[mode]}</span>{" "}
-                from genesis ({LOCKUP_BONUS_PCT[mode]} reward bonus, year 1).
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                <li>
-                  <span className="font-medium text-blue-600 dark:text-blue-300">
-                    Issued (sim)
-                  </span>
-                  {" "}— cumulative, multiplier-scaled.
-                </li>
-                <li>
-                  <span className="font-medium text-purple-600 dark:text-purple-300">
-                    Unlocked (sim)
-                  </span>
-                  {" "}— issued, shifted right by {lockupDays(mode)} days.
-                </li>
-                <li>
-                  <span className="font-medium text-orange-600 dark:text-orange-300">
-                    SOAP burn
-                  </span>
-                  {" "}— same as Mined mode.
-                </li>
-                <li>
-                  <span className="font-medium text-emerald-600 dark:text-emerald-300">
-                    Actual mined
-                  </span>
-                  {" "}(green dashed) — no-multiplier baseline for comparison.
-                </li>
-              </ul>
-              <p className="mt-1">
-                Gap between issued and unlocked = in-flight overhang.
-                Longer locks earn more — see bonuses on each toggle.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
-              <p>
-                Both lines zero-anchored at SOAP activation
-                ({SOAP_ACTIVATION_DATE}).
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                <li>
-                  <span className="font-medium text-blue-600 dark:text-blue-300">
-                    Mined
-                  </span>
-                  {" "}— cumulative QUAI paid out via mining.
-                </li>
-                <li>
-                  <span className="font-medium text-orange-600 dark:text-orange-300">
-                    SOAP burn
-                  </span>
-                  {" "}— cumulative since SOAP day.
-                </li>
-                <li>
-                  <span className="font-medium text-emerald-600 dark:text-emerald-300">
-                    Net
-                  </span>
-                  {" "}(dashed) — mined − burned, the net contribution to
-                  circulating.
-                </li>
-              </ul>
-              <p className="mt-1">
-                Try a lockup toggle to model what changes if every miner picks
-                that period.
-              </p>
-            </div>
-          )}
-        </div>
+        <CardTitle>QUAI mining vs SOAP burn since SOAP</CardTitle>
         <div className="flex items-center gap-1">
           <SamplingFootnote kind="averaged" />
           <InfoPopover label="About SOAP mining vs burn">

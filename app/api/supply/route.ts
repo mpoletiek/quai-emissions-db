@@ -31,23 +31,23 @@ import {
   SINGULARITY_FORK_DATE,
   SINGULARITY_SKIP_QUAI,
 } from "@/lib/quai/protocol-constants";
+import { apiServerError, parseRangeParams } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const GRAIN_TO_VIEW: Record<string, string> = {
+const GRAIN_TO_VIEW: Record<"day" | "week" | "month", string> = {
   day: "v_supply_daily",
   week: "v_supply_weekly",
   month: "v_supply_monthly",
 };
 
-const GRAIN_TO_ROLLUP: Record<string, string> = {
+const GRAIN_TO_ROLLUP: Record<"day" | "week" | "month", string> = {
   day: "rollups_daily",
   week: "rollups_weekly",
   month: "rollups_monthly",
 };
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS = 3000;
 
 type SupplyRow = {
@@ -67,33 +67,19 @@ type SupplyRow = {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const period = url.searchParams.get("period") ?? "day";
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
+    const parsed = parseRangeParams(url);
+    if (parsed instanceof NextResponse) return parsed;
+    const { period, from, to } = parsed;
     const includeRaw = url.searchParams.get("include") ?? "qi,burn";
     const include = new Set(includeRaw.split(",").map((s) => s.trim()).filter(Boolean));
 
     const view = GRAIN_TO_VIEW[period];
-    if (!view) {
-      return NextResponse.json(
-        { error: `invalid period: ${period} (expected day|week|month)` },
-        { status: 400 },
-      );
-    }
-    if (!from || !ISO_DATE_RE.test(from) || !to || !ISO_DATE_RE.test(to)) {
-      return NextResponse.json(
-        { error: "from and to are required as YYYY-MM-DD" },
-        { status: 400 },
-      );
-    }
 
     // Cumulative mining issuance (block reward + workshare reward) summed
-    // over ALL prior periods, then filtered to the requested window. This
-    // lets charts decompose realized supply into mining issuance vs.
-    // genesis vesting unlocks. The window-sum runs over the full table —
-    // that's only a few hundred to a few thousand rows per grain, so it's
-    // cheap. Without this, a window starting at e.g. 2026-01-01 would
-    // restart cumulative_mined from zero on that date.
+    // up to the end of the requested window. The CTE is bounded by `to` so
+    // the window function only scans rows the caller can actually see —
+    // critical as the rollup tables grow. Without `WHERE period_start <= $2`,
+    // the window scan would fan out across the entire table on every request.
     const wantsMined = include.has("mined");
     const rollupTable = GRAIN_TO_ROLLUP[period];
 
@@ -106,6 +92,7 @@ export async function GET(req: Request) {
                + COALESCE(workshare_reward_avg * workshare_total, 0)
              ) OVER (ORDER BY period_start) AS cumulative_mined
            FROM ${rollupTable}
+           WHERE period_start <= $2::date
          )
          SELECT
            to_char(v.period_start, 'YYYY-MM-DD') AS period_start,
@@ -177,7 +164,6 @@ export async function GET(req: Request) {
       },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return apiServerError("api/supply", err);
   }
 }

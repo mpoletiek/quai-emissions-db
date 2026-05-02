@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { serializeBig } from "@/lib/quai/serialize";
+import { apiServerError, parseRangeParams } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const GRAIN_TO_TABLE: Record<string, string> = {
+const GRAIN_TO_TABLE: Record<"day" | "week" | "month", string> = {
   day: "rollups_daily",
   week: "rollups_weekly",
   month: "rollups_monthly",
 };
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS = 3000;
 
 type RollupSqlRow = {
@@ -116,23 +116,10 @@ function toRollup(r: RollupSqlRow) {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const period = url.searchParams.get("period") ?? "day";
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
-
+    const parsed = parseRangeParams(url);
+    if (parsed instanceof NextResponse) return parsed;
+    const { period, from, to } = parsed;
     const table = GRAIN_TO_TABLE[period];
-    if (!table) {
-      return NextResponse.json(
-        { error: `invalid period: ${period} (expected day|week|month)` },
-        { status: 400 },
-      );
-    }
-    if (!from || !ISO_DATE_RE.test(from) || !to || !ISO_DATE_RE.test(to)) {
-      return NextResponse.json(
-        { error: "from and to are required as YYYY-MM-DD" },
-        { status: 400 },
-      );
-    }
 
     const { rows } = await pool.query<RollupSqlRow>(
       `SELECT
@@ -174,7 +161,6 @@ export async function GET(req: Request) {
       },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return apiServerError("api/rollups", err);
   }
 }

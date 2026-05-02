@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { apiServerError } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -69,7 +70,6 @@ export async function GET(req: Request) {
       },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return apiServerError("api/coinbase-leaderboard", err);
   }
 }

@@ -35,63 +35,10 @@ export const SINGULARITY_FORK_BLOCK = 1_530_500n;
 export const SINGULARITY_FORK_DATE = "2026-03-19";
 export const SOAP_ACTIVATION_DATE = "2025-12-17";
 
-/** Registry of protocol events for time-series annotation. Consumed by
- *  ProtocolEventLines and any chart that wants to mark milestones. */
-export type ProtocolEvent = {
-  id: string;
-  label: string;
-  date: string; // YYYY-MM-DD UTC
-  blockNumber?: bigint;
-  description: string;
-};
-
-export const PROTOCOL_EVENTS: ProtocolEvent[] = [
-  {
-    id: "mainnet",
-    label: "Mainnet",
-    date: "2025-01-29",
-    description: "Quai mainnet launch.",
-  },
-  {
-    id: "tge",
-    label: "TGE",
-    date: "2025-02-04",
-    description: "Token generation event; QUAI public trading begins.",
-  },
-  {
-    id: "qi-launch",
-    label: "Qi launch",
-    date: "2025-04-01",
-    description: "Qi mining begins; the dual-token system goes live.",
-  },
-  {
-    id: "soap",
-    label: "SOAP",
-    date: SOAP_ACTIVATION_DATE,
-    blockNumber: SOAP_FORK_BLOCK,
-    description:
-      "SOAP activation — KawPoW seals + SHA/Scrypt merge-mined workshares.",
-  },
-  {
-    id: "singularity",
-    label: "Singularity",
-    date: SINGULARITY_FORK_DATE,
-    blockNumber: SINGULARITY_FORK_BLOCK,
-    description:
-      "Singularity Fork — ~1.67 B QUAI of future genesis unlocks permanently skipped.",
-  },
-  {
-    id: "kraken",
-    label: "Kraken",
-    date: "2026-04-08",
-    description: "QUAI listed on Kraken.",
-  },
-];
-
-/** Look up an event by id. Returns null if absent. */
-export function getProtocolEvent(id: string): ProtocolEvent | null {
-  return PROTOCOL_EVENTS.find((e) => e.id === id) ?? null;
-}
+// The canonical chart-event registry lives in
+// `components/dashboard/history/ProtocolEventLines.tsx`. A second registry
+// used to live here but had no importers and had drifted in dates and IDs;
+// it was removed to keep a single source of truth.
 
 // ─── Coinbase lockup ─────────────────────────────────────────────────────
 // Source: go-quai params/protocol_params.go

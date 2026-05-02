@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
@@ -68,24 +68,7 @@ export function SupplyStoryChart({
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <CardTitle>QUAI supply story</CardTitle>
-          <ul className="mt-1 max-w-xl space-y-0.5 text-xs text-slate-900/80 dark:text-white/80">
-            <li>
-              <span className="font-medium text-blue-600 dark:text-blue-300">
-                Realized
-              </span>
-              {" "}— QUAI actually circulating on cyprus1.
-            </li>
-            <li>
-              <span className="font-medium text-orange-600 dark:text-orange-300">
-                SOAP burn
-              </span>
-              {" "}(hatched overlay at the floor) — minted QUAI sent to{" "}
-              <code>0x0050AF…</code> and retired.
-            </li>
-          </ul>
-        </div>
+        <CardTitle>QUAI supply story</CardTitle>
         <InfoPopover label="About the supply story">
           <p className="font-medium">Two layers</p>
           <ul className="mt-1 list-disc pl-4 text-slate-900/70 dark:text-white/70">

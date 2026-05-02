@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
@@ -64,14 +64,7 @@ export function AlgoCompositionChart({
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <CardTitle>SOAP algorithm composition</CardTitle>
-          <p className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
-            Daily share of workshares by algorithm. KawPoW seals each block;
-            KawPoW also merge-mines from RVN; SHA contributes via merge-mining
-            from BCH; Scrypt from LTC and DOGE.
-          </p>
-        </div>
+        <CardTitle>Workshare share by algorithm</CardTitle>
         <SamplingFootnote kind="extrapolated" />
       </div>
 

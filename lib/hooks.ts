@@ -2,7 +2,6 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { reviveBig } from "@/lib/quai/serialize";
 import type {
-  Emission,
   MiningInfo,
   Period,
   Rollup,
@@ -11,7 +10,7 @@ import type {
   SupplyInfo,
   SupplyRow,
 } from "@/lib/quai/types";
-import { STATS_REFRESH_MS, BLOCKS_REFRESH_MS } from "@/lib/quai/constants";
+import { STATS_REFRESH_MS } from "@/lib/quai/constants";
 
 export type StatsPayload = {
   supply: SupplyInfo;
@@ -33,33 +32,6 @@ export function useStats() {
       };
     },
     refetchInterval: STATS_REFRESH_MS,
-  });
-}
-
-export type EmissionsPayload = {
-  latest: number;
-  info: MiningInfo;
-  emissions: Emission[];
-  latestAnalytics: SupplyAnalytics | null;
-};
-
-export function useEmissions(limit = 500) {
-  return useQuery<EmissionsPayload>({
-    queryKey: ["emissions", limit],
-    queryFn: async () => {
-      const res = await fetch(`/api/emissions?limit=${limit}`);
-      if (!res.ok) throw new Error(`emissions ${res.status}`);
-      const raw = await res.json();
-      return {
-        latest: raw.latest,
-        info: reviveBig<MiningInfo>(raw.info),
-        emissions: reviveBig<Emission[]>(raw.emissions),
-        latestAnalytics: raw.latestAnalytics
-          ? reviveBig<SupplyAnalytics>(raw.latestAnalytics)
-          : null,
-      };
-    },
-    refetchInterval: BLOCKS_REFRESH_MS,
   });
 }
 

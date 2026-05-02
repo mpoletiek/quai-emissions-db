@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { HomeHero } from "@/components/dashboard/home/HomeHero";
 import { SupplyStoryChart } from "@/components/dashboard/home/SupplyStoryChart";
 import { SupplyDecompositionChart } from "@/components/dashboard/home/SupplyDecompositionChart";
@@ -8,19 +8,14 @@ import { EmissionsComparisonChart } from "@/components/dashboard/home/EmissionsC
 import { QiCumulativeChart } from "@/components/dashboard/home/QiCumulativeChart";
 import { SingularityCallout } from "@/components/dashboard/home/SingularityCallout";
 import { SoapCallout } from "@/components/dashboard/home/SoapCallout";
-import {
-  TimeframeToggle,
-  type Timeframe,
-  timeframeToFromIso,
-  todayIso,
-} from "@/components/dashboard/shared/TimeframeToggle";
+import { todayIso } from "@/components/dashboard/shared/TimeframeToggle";
 
-// Mainnet date — earliest meaningful from-date when the user picks "all".
-// Anything before this is empty rollup space.
+// Mainnet date — earliest from-date so every protocol-event annotation
+// (Qi launch, SOAP, 1Y Cliff, Singularity) is visible.
 const MAINNET_DATE = "2025-01-29";
 
 // Hero strip pulls a small fixed window so the 7-day delta is always
-// computable, regardless of the user's flagship-chart timeframe.
+// computable, regardless of the flagship-chart range.
 const HERO_FROM = (() => {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - 14);
@@ -28,12 +23,7 @@ const HERO_FROM = (() => {
 })();
 
 export default function DashboardHomePage() {
-  // Flagship timeframe is independent from hero strip — user controls how
-  // far back the supply story goes. Default "all" so every protocol-event
-  // annotation (Qi launch, SOAP, 1Y Cliff, Singularity) is visible without
-  // the user reaching for the toggle.
-  const [tf, setTf] = useState<Timeframe>("all");
-  const flagshipFrom = timeframeToFromIso(tf) ?? MAINNET_DATE;
+  const flagshipFrom = MAINNET_DATE;
   const flagshipTo = todayIso();
 
   useEffect(() => {
@@ -75,13 +65,6 @@ export default function DashboardHomePage() {
           <SingularityCallout />
         </div>
       </details>
-
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <span className="text-[0.7rem] uppercase tracking-wider text-slate-900/55 dark:text-white/55">
-          Range
-        </span>
-        <TimeframeToggle value={tf} onChange={setTf} />
-      </div>
 
       <div className="fade-in-stagger space-y-6">
         <SupplyStoryChart from={flagshipFrom} to={flagshipTo} />

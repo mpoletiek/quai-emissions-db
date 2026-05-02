@@ -64,12 +64,20 @@ function yearsBetween(later: Date, earlier: Date): number {
 
 export function EmissionsComparisonChart() {
   // Pull Quai realized supply from the last 14 days; we just need a fresh
-  // anchor — a single row works.
-  const today = new Date();
-  const todayIso = today.toISOString().slice(0, 10);
-  const lookbackIso = new Date(today.getTime() - 14 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  // anchor — a single row works. `today` was previously computed inline on
+  // every render, which made `useSupply`'s query key (and downstream
+  // useMemos that depend on it) churn on every parent re-render — driving
+  // an infinite refetch loop. Lock it to mount-time.
+  const { today, todayIso, lookbackIso } = useMemo(() => {
+    const t = new Date();
+    return {
+      today: t,
+      todayIso: t.toISOString().slice(0, 10),
+      lookbackIso: new Date(t.getTime() - 14 * 86_400_000)
+        .toISOString()
+        .slice(0, 10),
+    };
+  }, []);
   const { data } = useSupply({
     period: "day",
     from: lookbackIso,
@@ -162,35 +170,7 @@ export function EmissionsComparisonChart() {
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <CardTitle>QUAI vs Bitcoin emission curves</CardTitle>
-          <div className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
-            <p>
-              Cumulative supply as % of each network's cap, aligned from
-              each genesis (year 0 = launch).
-            </p>
-            <ul className="mt-1 space-y-0.5">
-              <li>
-                <span className="font-medium text-blue-600 dark:text-blue-300">
-                  QUAI
-                </span>
-                {" "}— launched 2025; "Now" line at year ~1; caps at 1.4 B by
-                year ~4.
-              </li>
-              <li>
-                <span className="font-medium text-orange-600 dark:text-orange-300">
-                  Bitcoin
-                </span>
-                {" "}— launched 2009; "Now" line at year ~17; approaches 21 M
-                asymptotically by year ~131.
-              </li>
-            </ul>
-            <p className="mt-1">
-              Same x position = same network age, not same calendar date —
-              that's how the early-emission shapes line up to compare.
-            </p>
-          </div>
-        </div>
+        <CardTitle>QUAI vs Bitcoin emission curves</CardTitle>
         <InfoPopover label="About the comparison">
           <p>
             <span className="font-medium">X-axis</span>: years since each

@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/dashboard", label: "Home", exact: true },
   { href: "/dashboard/mining", label: "Mining" },
-  { href: "/dashboard/history", label: "History" },
 ];
 
 function isActive(pathname: string | null, t: { href: string; exact?: boolean }) {
@@ -71,7 +70,7 @@ export function DashboardSubNav() {
       <span
         aria-hidden
         className={cn(
-          "pointer-events-none absolute bottom-0 h-[2px] rounded-full bg-blue-500 dark:bg-blue-400",
+          "pointer-events-none absolute bottom-0 h-[2px] rounded-full bg-quai-500 dark:bg-quai-400",
           "transition-[left,width] duration-300 ease-out",
         )}
         style={{

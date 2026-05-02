@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { ChartLegend } from "@/components/ui/ChartLegend";
@@ -113,8 +113,18 @@ export function SupplyDecompositionChart({
 
     // Project anchorGenesis + (scheduled[future] − scheduled[anchor]) so
     // any small skew between the on-chain real number and the schedule
-    // gets absorbed at t=0.
-    const scheduledAtAnchor = cumulativeUnlockedPostSingularity(anchorDate);
+    // gets absorbed at t=0. The schedule is a step function keyed by
+    // date string — cache the lookup so we don't re-parse dates and walk
+    // the schedule table 2 190 times per recompute.
+    const scheduleCache = new Map<string, bigint>();
+    const sched = (iso: string): bigint => {
+      const hit = scheduleCache.get(iso);
+      if (hit !== undefined) return hit;
+      const v = cumulativeUnlockedPostSingularity(iso);
+      scheduleCache.set(iso, v);
+      return v;
+    };
+    const scheduledAtAnchor = sched(anchorDate);
 
     const horizonDate = addDays(anchorDate, PROJECTION_YEARS * 365);
     const projection: typeof historical = [];
@@ -124,12 +134,12 @@ export function SupplyDecompositionChart({
     // visually flattens the projection slope.
     for (let dayOffset = 1; dayOffset <= totalDays; dayOffset += 1) {
       const date = addDays(anchorDate, dayOffset);
+      const offsetBig = BigInt(dayOffset);
 
-      const grossMinedWei =
-        anchorMined + MINING_PER_DAY_WEI * BigInt(dayOffset);
-      const burnWei = anchorBurn + BURN_PER_DAY_WEI * BigInt(dayOffset);
+      const grossMinedWei = anchorMined + MINING_PER_DAY_WEI * offsetBig;
+      const burnWei = anchorBurn + BURN_PER_DAY_WEI * offsetBig;
 
-      const scheduledAtDate = cumulativeUnlockedPostSingularity(date);
+      const scheduledAtDate = sched(date);
       const scheduledDelta =
         scheduledAtDate > scheduledAtAnchor
           ? scheduledAtDate - scheduledAtAnchor
@@ -155,43 +165,32 @@ export function SupplyDecompositionChart({
     };
   }, [forecast, lastRow]);
 
-  // First row where gross mined exceeds visible genesis − burn — i.e. the
-  // cyan area is taller than (purple − hatched bite at the floor).
-  const crossoverDate = useMemo(() => {
-    for (const r of chartData) {
-      if (r.mined > r.genesis - r.burn) return r.date;
-    }
-    return null;
-  }, [chartData]);
-
-  // Snap the m48 vesting-complete marker to the first projection sample at
-  // or after VESTING_END_DATE. The XAxis is category-based on string dates,
-  // so a ReferenceLine with x="2029-01-08" only renders if that exact date
-  // exists in the data. Projection samples step every 7 days from anchor.
-  const vestingMarkerDate = useMemo(() => {
-    if (!forecast) return null;
-    for (const r of chartData) {
-      if (r.date >= VESTING_END_DATE) return r.date;
-    }
-    return null;
-  }, [chartData, forecast]);
-
-  // Even-spaced tick marks: pick the first chartData row landing on each
-  // calendar half-year (Jan 1 / Jul 1). With ~2,700 daily rows on a
-  // category-based axis, this guarantees ticks at consistent calendar
-  // boundaries instead of recharts' auto-placed defaults.
-  const xAxisTicks = useMemo(() => {
+  // Single pass over chartData (~2,700 rows when forecast is on) computes
+  // three independent things — collapsed from three separate useMemos:
+  //   1. crossoverDate: first row where the cyan layer (gross mined) tops
+  //      the visible genesis − burn — i.e. cyan area exceeds (purple −
+  //      hatched bite at the floor).
+  //   2. vestingMarkerDate: snap to the first projection sample at or
+  //      after VESTING_END_DATE. Required because the XAxis is
+  //      category-based and ReferenceLine x must match an exact data point.
+  //   3. xAxisTicks: every Jan 1 / Jul 1 row, for evenly-spaced ticks on
+  //      the category-based axis.
+  const { crossoverDate, vestingMarkerDate, xAxisTicks } = useMemo(() => {
+    let cross: string | null = null;
+    let vest: string | null = null;
+    const ticks: string[] = [];
     const seen = new Set<string>();
-    const out: string[] = [];
     for (const r of chartData) {
-      const md = r.date.slice(5); // "MM-DD"
+      if (cross == null && r.mined > r.genesis - r.burn) cross = r.date;
+      if (forecast && vest == null && r.date >= VESTING_END_DATE) vest = r.date;
+      const md = r.date.slice(5);
       if ((md === "01-01" || md === "07-01") && !seen.has(r.date)) {
         seen.add(r.date);
-        out.push(r.date);
+        ticks.push(r.date);
       }
     }
-    return out;
-  }, [chartData]);
+    return { crossoverDate: cross, vestingMarkerDate: vest, xAxisTicks: ticks };
+  }, [chartData, forecast]);
 
   const visibleTo = forecast && projectionRange ? projectionRange.to : to;
 
@@ -227,7 +226,7 @@ export function SupplyDecompositionChart({
                 (bottom): <code>quaiTotalEnd − minedNet</code>. True
                 genesis-unlocked premine — captures vesting-cliff unlocks (TGE
                 baseline ~478 M, staggered tail unlocks ~+30 M/mo at months
-                6–11, 1-year cliff +~181 M at month 12 ≈ 2026-01-23). After
+                6–11, 1-year cliff +~181 M at month 12 ≈ 2026-01-24). After
                 Singularity (m14, 2026-03-25) ~73% of each monthly unlock is
                 forfeited; the line plateaus at ~1.333 B at m48 (
                 <strong>{VESTING_END_DATE}</strong>).
@@ -272,9 +271,10 @@ export function SupplyDecompositionChart({
               </li>
             </ul>
             <p className="mt-2 text-slate-900/55 dark:text-white/55">
-              The genesis curve is exact (modulo 152 wei rounding); mining and
-              burn projections remain first-order — block rewards decay
-              log(difficulty), and burn velocity tracks parent-chain hashrate.
+              The genesis curve is exact to ~152 µQUAI rounding (sub-cent at
+              any plausible token price); mining and burn projections remain
+              first-order — block rewards decay log(difficulty), and burn
+              velocity tracks parent-chain hashrate.
             </p>
           </InfoPopover>
         </div>
@@ -433,8 +433,10 @@ export function SupplyDecompositionChart({
         const grossMined = lastRow.cumulativeMinedQuai ?? 0n;
         const burnLast = lastRow.burnClose ?? 0n;
         const minedNet = grossMined > burnLast ? grossMined - burnLast : 0n;
-        const genesisLast = lastRow.quaiTotalEnd > grossMined
-          ? lastRow.quaiTotalEnd - grossMined
+        // Genesis must be derived from minedNet (matching the chart series at
+        // line ~92); using grossMined here was short by burnClose.
+        const genesisLast = lastRow.quaiTotalEnd > minedNet
+          ? lastRow.quaiTotalEnd - minedNet
           : 0n;
         const netRateWei = MINING_PER_DAY_WEI - BURN_PER_DAY_WEI;
         return (

@@ -22,17 +22,16 @@ export function TopNav() {
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/"
-            className="shrink-0 text-sm font-semibold tracking-tight text-slate-900 dark:text-white/90"
+            className="shrink-0 font-display text-sm font-semibold tracking-tight"
           >
-            Quai Emissions
+            <span className="text-quai-500 dark:text-quai-400">Quai</span>{" "}
+            <span className="text-slate-900 dark:text-ink-50/90">Emissions</span>
           </Link>
           <span
             aria-hidden
-            className="hidden h-5 w-px shrink-0 bg-slate-900/10 dark:bg-white/10 sm:inline-block"
+            className="hidden h-5 w-px shrink-0 bg-slate-900/10 dark:bg-ink-50/10 sm:inline-block"
           />
-          <div className="min-w-0 overflow-x-auto">
-            <DashboardSubNav />
-          </div>
+          <DashboardSubNav />
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <StatusCluster />

@@ -244,9 +244,6 @@ export function cumulativeUnlockedPostSingularity(iso: string): bigint {
   return lookup(POST_SINGULARITY_UNLOCK_SCHEDULE, m);
 }
 
-/** Backwards-compat alias for the chart while it's still mid-rename. */
-export const cumulativeUnlockedAtCapped = cumulativeUnlockedPostSingularity;
-
 /** ISO date (YYYY-MM-DD UTC) of the start of schedule month `m`. */
 export function dateOfScheduleMonth(m: number): string {
   const ms =

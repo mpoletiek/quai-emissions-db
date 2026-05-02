@@ -2,61 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Light theme (default). CSS variables consumed by Recharts props and the
-   .card/.card-title component classes. Tailwind `dark:` prefix handles the
-   rest of the palette. */
+/* Theme aligned with the Quai Network official surfaces (qu.ai, soap.qu.ai,
+   docs.qu.ai). Dark-by-default warm-ember palette with brand red `#e22901`
+   as the primary signal color. CSS variables are consumed by Recharts
+   props and the .card/.card-title component classes; Tailwind `dark:`
+   prefix handles the rest of the palette via the ramps in tailwind.config.ts. */
+
 :root {
   color-scheme: light;
 
-  --background: #fafafc;
-  --foreground: #0f172a;
+  --background: #fbf7f3;
+  --foreground: #1a0e08;
 
   --card-bg: #ffffff;
-  --card-border: rgba(15, 23, 42, 0.06);
+  --card-border: rgba(40, 18, 10, 0.08);
 
-  --nav-bg: rgba(250, 250, 252, 0.85);
-  --nav-border: rgba(15, 23, 42, 0.08);
+  --nav-bg: rgba(251, 247, 243, 0.85);
+  --nav-border: rgba(40, 18, 10, 0.10);
 
   --popover-bg: #ffffff;
-  --popover-border: rgba(15, 23, 42, 0.12);
-  --popover-text: #0f172a;
+  --popover-border: rgba(40, 18, 10, 0.14);
+  --popover-text: #1a0e08;
+
+  --brand-red: #e22901;
+  --brand-red-deep: #c70000;
+  --brand-amber: #a84f26;
 
   /* Chart styling — passed through to Recharts props as `var(--...)` strings
      so the SVG inherits the current theme at render time. */
-  --chart-grid: rgba(15, 23, 42, 0.08);
-  --chart-grid-soft: rgba(15, 23, 42, 0.04);
-  --chart-axis: rgba(15, 23, 42, 0.55);
-  --chart-axis-muted: rgba(15, 23, 42, 0.4);
+  --chart-grid: rgba(40, 18, 10, 0.08);
+  --chart-grid-soft: rgba(40, 18, 10, 0.04);
+  --chart-axis: rgba(40, 18, 10, 0.55);
+  --chart-axis-muted: rgba(40, 18, 10, 0.4);
   --chart-tooltip-bg: #ffffff;
-  --chart-tooltip-border: rgba(15, 23, 42, 0.12);
-  --chart-tooltip-text: #0f172a;
-  --chart-reference-line: rgba(15, 23, 42, 0.3);
+  --chart-tooltip-border: rgba(40, 18, 10, 0.14);
+  --chart-tooltip-text: #1a0e08;
+  --chart-reference-line: rgba(40, 18, 10, 0.3);
 }
 
 .dark {
   color-scheme: dark;
 
-  --background: #0a0b10;
-  --foreground: #e5e7eb;
+  --background: #0d0a0b;
+  --foreground: #f6e8dc;
 
-  --card-bg: rgba(255, 255, 255, 0.03);
-  --card-border: rgba(255, 255, 255, 0.08);
+  --card-bg: rgba(62, 28, 17, 0.45);
+  --card-border: rgba(255, 219, 191, 0.10);
 
-  --nav-bg: rgba(10, 11, 16, 0.8);
-  --nav-border: rgba(255, 255, 255, 0.1);
+  --nav-bg: rgba(13, 10, 11, 0.85);
+  --nav-border: rgba(255, 219, 191, 0.10);
 
-  --popover-bg: #0f1117;
-  --popover-border: rgba(255, 255, 255, 0.1);
-  --popover-text: #e5e7eb;
+  --popover-bg: #170b07;
+  --popover-border: rgba(255, 219, 191, 0.14);
+  --popover-text: #f6e8dc;
 
-  --chart-grid: rgba(255, 255, 255, 0.06);
-  --chart-grid-soft: rgba(255, 255, 255, 0.03);
-  --chart-axis: rgba(255, 255, 255, 0.5);
-  --chart-axis-muted: rgba(255, 255, 255, 0.4);
-  --chart-tooltip-bg: #0f1117;
-  --chart-tooltip-border: rgba(255, 255, 255, 0.1);
-  --chart-tooltip-text: #e5e7eb;
-  --chart-reference-line: rgba(255, 255, 255, 0.3);
+  --brand-red: #e22901;
+  --brand-red-deep: #ff5656;
+  --brand-amber: #f0a16d;
+
+  --chart-grid: rgba(255, 219, 191, 0.08);
+  --chart-grid-soft: rgba(255, 219, 191, 0.04);
+  --chart-axis: rgba(246, 232, 220, 0.55);
+  --chart-axis-muted: rgba(246, 232, 220, 0.4);
+  --chart-tooltip-bg: #170b07;
+  --chart-tooltip-border: rgba(255, 219, 191, 0.16);
+  --chart-tooltip-text: #f6e8dc;
+  --chart-reference-line: rgba(255, 219, 191, 0.3);
 }
 
 html,
@@ -66,51 +77,80 @@ body {
   min-height: 100%;
 }
 
+/* Subtle warm-ember radial wash on the dark background — echoes the hero
+   gradients on qu.ai/soap.qu.ai without committing to a heavy marketing
+   look. Light mode keeps a flat surface. */
+.dark body {
+  background:
+    radial-gradient(1200px 600px at 70% -10%, rgba(226, 41, 1, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 10% 10%, rgba(226, 41, 1, 0.04), transparent 55%),
+    var(--background);
+  background-attachment: fixed;
+}
+
 body {
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
-    Arial,
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Display face for hero titles; opt-in via `font-display` Tailwind utility
+   or the .display-heading class. */
+.display-heading {
+  font-family: var(--font-display), "Space Grotesk", ui-sans-serif, system-ui,
     sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .card {
-  @apply rounded-xl p-4;
+  @apply rounded-md p-4;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   box-shadow:
-    0 1px 0 rgba(15, 23, 42, 0.04),
-    0 8px 24px -12px rgba(15, 23, 42, 0.08);
+    0 1px 0 rgba(40, 18, 10, 0.04),
+    0 8px 24px -12px rgba(40, 18, 10, 0.08);
 }
 
 .dark .card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%),
+    linear-gradient(180deg, rgba(255, 219, 191, 0.03) 0%, rgba(255, 219, 191, 0.01) 100%),
     var(--card-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--card-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 1px 2px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 219, 191, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 24px 60px -30px rgba(0, 0, 0, 0.55);
 }
 
 .card-title {
   @apply text-base font-semibold tracking-tight;
-  color: rgba(15, 23, 42, 0.95);
+  font-family: var(--font-display), "Space Grotesk", ui-sans-serif, system-ui,
+    sans-serif;
+  color: rgba(26, 14, 8, 0.95);
 }
 
 .dark .card-title {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(246, 232, 220, 0.96);
 }
 
-/* Tabular numerals — applied to KPI / value cells in Phase 2 to keep
-   monospaced columns aligned without forcing a monospace font. */
+/* Tabular numerals — applied to KPI / value cells to keep monospaced
+   columns aligned without forcing a monospace font. */
 .tabular {
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
+}
+
+/* Mono-eyebrow labels — small uppercase data-style headers, matches the
+   "01 / 03" pattern on qu.ai's marketing surfaces. */
+.eyebrow {
+  font-family: var(--font-mono), ui-monospace, "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(168, 134, 109, 0.9);
+}
+.dark .eyebrow {
+  color: rgba(208, 178, 158, 0.7);
 }
 
 /* Chart loading shimmer. Skeleton component sweeps a soft highlight across
@@ -127,9 +167,9 @@ body {
 .shimmer {
   background: linear-gradient(
     90deg,
-    rgba(15, 23, 42, 0.04) 0%,
-    rgba(15, 23, 42, 0.08) 50%,
-    rgba(15, 23, 42, 0.04) 100%
+    rgba(40, 18, 10, 0.04) 0%,
+    rgba(40, 18, 10, 0.08) 50%,
+    rgba(40, 18, 10, 0.04) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
@@ -138,20 +178,17 @@ body {
 .dark .shimmer {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.09) 50%,
-    rgba(255, 255, 255, 0.04) 100%
+    rgba(255, 219, 191, 0.04) 0%,
+    rgba(255, 219, 191, 0.10) 50%,
+    rgba(255, 219, 191, 0.04) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
-/* Staggered fade-in on mount — Phase 2. Each direct child fades + slides up
-   8px on first mount with a 30ms stagger. Uses CSS `@starting-style` so
-   the entry only fires on initial mount (per spec) — re-renders don't
-   re-trigger. Older browsers without @starting-style support degrade
-   gracefully: children appear instantly, no broken layout.
-   Respects prefers-reduced-motion. */
+/* Staggered fade-in on mount. Each direct child fades + slides up 8px on
+   first mount with a 30ms stagger via @starting-style. Older browsers
+   degrade to instant-render. Respects prefers-reduced-motion. */
 @media (prefers-reduced-motion: no-preference) {
   .fade-in-stagger > * {
     opacity: 1;
@@ -166,33 +203,19 @@ body {
       transform: translateY(8px);
     }
   }
-  .fade-in-stagger > *:nth-child(1) {
-    transition-delay: 0ms;
-  }
-  .fade-in-stagger > *:nth-child(2) {
-    transition-delay: 30ms;
-  }
-  .fade-in-stagger > *:nth-child(3) {
-    transition-delay: 60ms;
-  }
-  .fade-in-stagger > *:nth-child(4) {
-    transition-delay: 90ms;
-  }
-  .fade-in-stagger > *:nth-child(5) {
-    transition-delay: 120ms;
-  }
-  .fade-in-stagger > *:nth-child(6) {
-    transition-delay: 150ms;
-  }
+  .fade-in-stagger > *:nth-child(1) { transition-delay: 0ms; }
+  .fade-in-stagger > *:nth-child(2) { transition-delay: 30ms; }
+  .fade-in-stagger > *:nth-child(3) { transition-delay: 60ms; }
+  .fade-in-stagger > *:nth-child(4) { transition-delay: 90ms; }
+  .fade-in-stagger > *:nth-child(5) { transition-delay: 120ms; }
+  .fade-in-stagger > *:nth-child(6) { transition-delay: 150ms; }
 }
 
-/* RecentBlocksFeed flash-on-arrival — Phase 3. New rows (block number
-   greater than the previous max captured at render time) get
-   data-fresh="true" and pulse emerald briefly. One-shot keyframe so the
-   row settles back to default background. Reduced-motion users skip it. */
+/* RecentBlocksFeed flash-on-arrival. New rows get data-fresh="true" and
+   pulse warm amber briefly. */
 @keyframes row-flash {
   0% {
-    background: rgba(16, 185, 129, 0.18);
+    background: rgba(240, 161, 109, 0.20);
   }
   100% {
     background: transparent;

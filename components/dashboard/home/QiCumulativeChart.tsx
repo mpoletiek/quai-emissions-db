@@ -16,9 +16,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { ChartLegend } from "@/components/ui/ChartLegend";
 import { ChartSkeleton } from "@/components/ui/ChartSkeleton";
+
+const QI_CUMULATIVE_LEGEND = [
+  { label: "Cumulative Qi minted", color: "#10b981" },
+];
 
 // QiCumulativeChart — single-line cumulative Qi supply since Qi mining began.
 // Qi has no sinks (no burn, no Singularity skip), so the line is monotonically
@@ -52,15 +57,7 @@ export function QiCumulativeChart({
   return (
     <Card>
       <CardTitle>Qi cumulative supply</CardTitle>
-      <ul className="mt-1 max-w-md space-y-0.5 text-xs text-slate-900/80 dark:text-white/80">
-        <li>
-          <span className="font-medium text-emerald-600 dark:text-emerald-300">
-            Green line
-          </span>
-          {" "}— running total of every Qi minted on cyprus1.
-        </li>
-        <li>No burn, no skip mechanism — monotonically rising.</li>
-      </ul>
+      <ChartLegend items={QI_CUMULATIVE_LEGEND} className="mt-3" />
 
       <div className="mt-3 h-56">
         {isLoading || !data ? (

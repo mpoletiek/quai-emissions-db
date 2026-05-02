@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProtocolEventLines } from "@/components/dashboard/history/ProtocolEventLines";
+import { ProtocolEventLines } from "@/components/dashboard/shared/ProtocolEventLines";
 import { SamplingFootnote } from "@/components/dashboard/shared/SamplingFootnote";
 import { InfoPopover } from "@/components/ui/InfoPopover";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
@@ -92,15 +92,7 @@ export function QuaiPerAlgoChart({
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <CardTitle>QUAI rewarded per algorithm</CardTitle>
-          <p className="mt-1 max-w-xl text-xs text-slate-900/80 dark:text-white/80">
-            Daily QUAI emission split by SOAP algorithm. KawPoW receives both
-            block rewards (it seals every block) and workshare rewards; SHA
-            and Scrypt receive workshare rewards only. Pre-SOAP days are
-            omitted — the per-algo split didn't exist.
-          </p>
-        </div>
+        <CardTitle>QUAI rewarded per algorithm</CardTitle>
         <div className="flex items-center gap-1">
           <SamplingFootnote kind="extrapolated" />
           <InfoPopover label="About QUAI per algorithm">
